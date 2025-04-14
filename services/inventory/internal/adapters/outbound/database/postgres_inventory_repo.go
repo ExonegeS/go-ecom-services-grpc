@@ -208,6 +208,9 @@ func (r *postgresInventoryRepository) GetAllInventoryItems(ctx context.Context, 
 	`
 
 	if pagination.SortBy != "" {
+		if pagination.SortBy == entity.SortByQuantity {
+			pagination.SortBy = "stock_quantity"
+		}
 		query += fmt.Sprintf(" ORDER BY %s", pagination.SortBy)
 	}
 

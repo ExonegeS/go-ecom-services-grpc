@@ -214,6 +214,7 @@ func (h *InventoryHandler) GetPaginatedInventoryItems(w http.ResponseWriter, r *
 		entity.SortByID,
 		entity.SortByName,
 		entity.SortByPrice,
+		entity.SortByQuantity,
 		entity.SortByCreatedAt,
 		entity.SortByUpdatedAt,
 	})
