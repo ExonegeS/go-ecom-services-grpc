@@ -21,6 +21,7 @@ type InventoryService interface {
 	CreateCategory(ctx context.Context, category *entity.Category) error
 	UpdateCategory(ctx context.Context, id entity.UUID, params UpdateCategoryParams) (*entity.Category, error)
 	DeleteCategory(ctx context.Context, id entity.UUID) (*entity.Category, error)
+	GetPaginatedCategories(ctx context.Context, pagination *entity.Pagination) (*entity.PaginationResponse[*entity.Category], error)
 }
 
 type UpdateInventoryItemParams struct {
@@ -131,6 +132,30 @@ func (s *inventoryService) GetPaginatedInventoryItems(ctx context.Context, pagin
 	}
 
 	return &entity.PaginationResponse[*entity.InventoryItem]{
+		CurrentPage: pagination.Page,
+		HasNextPage: pagination.Page < totalPages,
+		PageSize:    pagination.PageSize,
+		TotalPages:  totalPages,
+		Data:        items,
+	}, nil
+}
+
+func (s *inventoryService) GetPaginatedCategories(ctx context.Context, pagination *entity.Pagination) (*entity.PaginationResponse[*entity.Category], error) {
+	const op = "inventoryService.GetPaginatedCategories"
+
+	totalItems, err := s.inventoryRepo.GetTotalCategoriesCount(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", op, err)
+	}
+
+	totalPages := (totalItems + pagination.PageSize - 1) / pagination.PageSize
+
+	items, err := s.inventoryRepo.GetAllCategories(ctx, pagination)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", op, err)
+	}
+
+	return &entity.PaginationResponse[*entity.Category]{
 		CurrentPage: pagination.Page,
 		HasNextPage: pagination.Page < totalPages,
 		PageSize:    pagination.PageSize,

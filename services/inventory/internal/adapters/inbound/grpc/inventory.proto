@@ -8,8 +8,14 @@ service InventoryService {
   rpc CreateProduct(CreateProductRequest) returns (ProductResponse);
   rpc GetProductByID(GetProductRequest) returns (ProductResponse);
   rpc UpdateProduct(UpdateProductRequest) returns (ProductResponse);
-  rpc DeleteProduct(DeleteProductRequest) returns (Empty);
+  rpc DeleteProduct(DeleteProductRequest) returns (ProductResponse);
   rpc ListProducts(ListProductsRequest) returns (ListProductsResponse);
+
+  rpc CreateCategory(CreateCategoryRequest) returns (CategoryResponse);
+  rpc GetCategoryByID(GetCategoryRequest) returns (CategoryResponse);
+  rpc UpdateCategory(UpdateCategoryRequest) returns (CategoryResponse);
+  rpc DeleteCategory(DeleteCategoryRequest) returns (CategoryResponse);
+  rpc ListCategories(ListCategoriesRequest) returns (ListCategoriesResponse);
 }
 
 message Product {
@@ -66,6 +72,35 @@ message ListProductsRequest {
   string sort_by = 3;
 }
 
+// Categories
+
+message CreateCategoryRequest {
+  string name = 1;
+  string description = 2;
+}
+
+message GetCategoryRequest {
+  string id = 1;
+}
+
+message UpdateCategoryRequest {
+  string id = 1;
+  optional string name = 2;
+  optional string description = 3;
+}
+
+message DeleteCategoryRequest {
+  string id = 1;
+}
+
+message ListCategoriesRequest {
+  int32 page = 1;
+  int32 page_size = 2;
+  string sort_by = 3;
+}
+
+
+
 message ListProductsResponse {
   int32 current_page = 1;
   bool has_next_page = 2;
@@ -77,5 +112,18 @@ message ListProductsResponse {
 message ProductResponse {
   Product product = 1;
 }
+
+message CategoryResponse {
+  Category category = 1;
+}
+
+message ListCategoriesResponse {
+  int32 current_page = 1;
+  bool has_next_page = 2;
+  int32 page_size = 3;
+  int32 total_pages = 4;
+  repeated Category categories = 5;
+}
+
 
 message Empty {}

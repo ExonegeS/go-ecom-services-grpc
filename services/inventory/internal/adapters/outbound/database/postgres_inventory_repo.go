@@ -402,3 +402,66 @@ func (r *postgresInventoryRepository) DeleteCategoryByID(ctx context.Context, id
 		return nil
 	})
 }
+
+func (r *postgresInventoryRepository) GetTotalCategoriesCount(ctx context.Context) (int64, error) {
+	const op = "postgresInventoryRepository.GetTotalCategoriesCount"
+
+	var total int64
+	err := r.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM categories").Scan(&total)
+	if err != nil {
+		return 0, fmt.Errorf("%s: %w", op, err)
+	}
+	return total, nil
+}
+
+func (r *postgresInventoryRepository) GetAllCategories(ctx context.Context, pagination *entity.Pagination) ([]*entity.Category, error) {
+	const op = "postgresInventoryRepository.GetAllInventoryItems"
+
+	query := `
+		SELECT id, name, description, created_at, updated_at
+		FROM categories
+	`
+
+	if pagination.SortBy != "" {
+		query += fmt.Sprintf(" ORDER BY %s", pagination.SortBy)
+	}
+
+	offset := (pagination.Page - 1) * pagination.PageSize
+	query += fmt.Sprintf(" LIMIT %d OFFSET %d", pagination.PageSize, offset)
+
+	rows, err := r.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", op, err)
+	}
+	defer rows.Close()
+
+	var modelItems []model.Category
+	for rows.Next() {
+		var model model.Category
+		err := rows.Scan(
+			&model.ID,
+			&model.Name,
+			&model.Description,
+			&model.CreatedAt,
+			&model.UpdatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", op, err)
+		}
+		modelItems = append(modelItems, model)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("%s: %w", op, err)
+	}
+
+	entities := make([]*entity.Category, 0, len(modelItems))
+	for _, m := range modelItems {
+		e, err := model.ModelToCategory(&m)
+		if err == nil {
+			entities = append(entities, e)
+		}
+	}
+
+	return entities, nil
+}

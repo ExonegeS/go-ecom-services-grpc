@@ -11,4 +11,6 @@ type CategoryRepository interface {
 	SaveCategory(ctx context.Context, item entity.Category) error
 	UpdateCategoryByID(ctx context.Context, id entity.UUID, updateFn func(*entity.Category) (bool, error)) error
 	DeleteCategoryByID(ctx context.Context, id entity.UUID) error
+	GetTotalCategoriesCount(ctx context.Context) (int64, error)
+	GetAllCategories(ctx context.Context, pagination *entity.Pagination) ([]*entity.Category, error)
 }
