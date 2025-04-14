@@ -1,0 +1,63 @@
+version: '3.8'
+
+services:
+
+  gateway:
+    container_name: gateway-service
+    build:
+      context: ./services
+      dockerfile: Dockerfile.gateway
+    ports:
+      - "80:8080"
+    env_file:
+      - ./services/gateway/.env.prod
+    depends_on:
+      - inventory_service
+
+  inventory_service:
+    container_name: inventory-service
+    build:
+      context: ./services
+      dockerfile: Dockerfile.inventory
+    ports:
+      - "8081:8081"
+    depends_on:
+      - inventory_db
+    env_file:
+      - ./services/inventory/.env.prod
+
+  inventory_db:
+    image: postgres:latest
+    container_name: inventory-postgres
+    env_file:
+      - ./services/inventory/.env.prod
+    volumes:
+      - ./migrations/inventory:/docker-entrypoint-initdb.d
+    ports:
+      - 5432:5432
+    restart: always
+
+  orders_service:
+    container_name: orders-service
+    build:
+      context: ./services
+      dockerfile: Dockerfile.orders
+    expose:
+      - "80"
+    depends_on:
+      - orders_db
+    env_file:
+      - ./services/orders/.env.prod
+
+  orders_db:
+    image: postgres:latest
+    container_name: orders-postgres
+    env_file:
+      - ./services/orders/.env.prod
+    volumes:
+      - ./scripts/orders:/docker-entrypoint-initdb.d
+    restart: always
+
+networks:
+  default:
+    driver: bridge

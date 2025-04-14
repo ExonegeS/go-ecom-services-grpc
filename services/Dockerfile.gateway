@@ -1,0 +1,12 @@
+FROM golang:1.24
+
+WORKDIR /app
+
+COPY gateway/ ./gateway/
+COPY pkg/ ./pkg/
+
+WORKDIR /app/gateway
+
+RUN go build -o service ./cmd
+
+CMD ["./service"]

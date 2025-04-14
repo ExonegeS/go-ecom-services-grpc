@@ -1,0 +1,12 @@
+FROM golang:1.24
+
+WORKDIR /app
+
+COPY inventory/ ./inventory/
+COPY pkg/ ./pkg/
+
+WORKDIR /app/inventory
+
+RUN go build -o service ./cmd
+
+CMD ["./service"]
