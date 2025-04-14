@@ -48,7 +48,6 @@ func (r *postgresInventoryRepository) GetByID(ctx context.Context, id entity.UUI
 		&product.CreatedAt,
 		&product.UpdatedAt,
 	)
-	fmt.Println("product", product)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, model.ErrProductNotFound
