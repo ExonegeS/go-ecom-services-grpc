@@ -47,8 +47,7 @@ func (s *APIServer) Run() error {
 	healthHandler.RegisterEndpoints(s.mux, s.cfg)
 
 	loggerMW := middleware.NewLoggerMW(s.logger)
-	_ = loggerMW
-	MWChain := middleware.NewMiddlewareChain()
+	MWChain := middleware.NewMiddlewareChain(middleware.RecoveryMW, loggerMW)
 
 	go func() {
 		lis, err := net.Listen("tcp", fmt.Sprintf(":%s", s.cfg.Server.GRPCPort))
