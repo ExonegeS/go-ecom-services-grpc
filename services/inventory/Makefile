@@ -1,2 +1,2 @@
 proto:
-	protoc   -I=api/proto/inventory/   --go_out=paths=source_relative:internal/adapters/inbound/grpc   --go-grpc_out=paths=source_relative:internal/adapters/inbound/grpc   api/proto/inventory/inventory.proto
+	protoc   -I=internal/adapters/inbound/grpc/  --go_out=paths=source_relative:internal/adapters/inbound/grpc   --go-grpc_out=paths=source_relative:internal/adapters/inbound/grpc   internal/adapters/inbound/grpc/inventory.proto

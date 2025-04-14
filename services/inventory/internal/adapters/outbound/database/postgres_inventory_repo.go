@@ -249,13 +249,41 @@ func (r *postgresInventoryRepository) GetAllInventoryItems(ctx context.Context, 
 
 	entities := make([]*entity.InventoryItem, 0, len(modelItems))
 	for _, m := range modelItems {
-		e, err := model.ModelToInventoryItem(&m, nil)
+		c, err := r.fetchCategoryData(ctx, entity.UUID(m.CategoryID.String))
+		fmt.Println(c)
+		cPtr := &c
+		if err != nil {
+			cPtr = nil
+		}
+		e, err := model.ModelToInventoryItem(&m, cPtr)
 		if err == nil {
 			entities = append(entities, e)
 		}
 	}
 
 	return entities, nil
+}
+
+func (r *postgresInventoryRepository) fetchCategoryData(ctx context.Context, categoryID entity.UUID) (category model.Category, err error) {
+	const op = "postgresInventoryRepository.fetchCategoryData"
+
+	err = r.db.QueryRowContext(ctx,
+		`SELECT id, name, description, created_at, updated_at FROM categories WHERE id = $1`, categoryID,
+	).Scan(
+		&category.ID,
+		&category.Name,
+		&category.Description,
+		&category.CreatedAt,
+		&category.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			err = model.ErrCategoryNotFound
+			return
+		}
+		err = fmt.Errorf("%s: %w", op, err)
+	}
+	return
 }
 
 func (r *postgresInventoryRepository) GetTotalCount(ctx context.Context) (int64, error) {

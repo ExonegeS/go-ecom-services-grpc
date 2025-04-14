@@ -63,12 +63,15 @@ message DeleteProductRequest {
 message ListProductsRequest {
   int32 page = 1;
   int32 page_size = 2;
-  string filter = 3;
+  string sort_by = 3;
 }
 
 message ListProductsResponse {
-  repeated Product products = 1;
-  int32 total = 2;
+  int32 current_page = 1;
+  bool has_next_page = 2;
+  int32 page_size = 3;
+  int32 total_pages = 4;
+  repeated Product products = 5;
 }
 
 message ProductResponse {

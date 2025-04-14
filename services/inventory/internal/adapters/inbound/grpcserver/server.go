@@ -42,11 +42,18 @@ func (s *InventoryServer) GetProductByID(ctx context.Context, req *pb.GetProduct
 		Id:          product.ID.String(),
 		Name:        product.Name,
 		Description: product.Description,
-		Price:       product.Price,
-		Quantity:    product.Quantity,
-		Unit:        product.Unit,
-		CreatedAt:   product.CreatedAt.Format(time.RFC3339),
-		UpdatedAt:   product.UpdatedAt.Format(time.RFC3339),
+		Category: &pb.Category{
+			Id:          string(product.Category.ID),
+			Name:        product.Category.Name,
+			Description: product.Category.Description,
+			CreatedAt:   product.Category.CreatedAt.Format(time.RFC3339),
+			UpdatedAt:   product.Category.UpdatedAt.Format(time.RFC3339),
+		},
+		Price:     product.Price,
+		Quantity:  product.Quantity,
+		Unit:      product.Unit,
+		CreatedAt: product.CreatedAt.Format(time.RFC3339),
+		UpdatedAt: product.UpdatedAt.Format(time.RFC3339),
 	}
 
 	return &pb.ProductResponse{Product: respProduct}, nil
@@ -68,8 +75,44 @@ func (s *InventoryServer) DeleteProduct(ctx context.Context, req *pb.DeleteProdu
 }
 
 func (s *InventoryServer) ListProducts(ctx context.Context, req *pb.ListProductsRequest) (*pb.ListProductsResponse, error) {
-	s.logger.Info("Received ListProducts gRPC request", "page", req.GetPage(), "page_size", req.GetPageSize())
-	return nil, fmt.Errorf("ListProducts not implemented")
+	s.logger.Info("Received ListProducts gRPC request", "page", req.GetPage(), "page_size", req.GetPageSize(), "sort_by", req.GetSortBy())
+	pagination := entity.NewPagination(int64(req.GetPage()), int64(req.GetPageSize()), entity.SortOption(req.GetSortBy()))
+	paginatedData, err := s.service.GetPaginatedInventoryItems(ctx, pagination)
+	if err != nil {
+		s.logger.Error("Failed to get inventory items", "error", err.Error())
+		return nil, fmt.Errorf("failed to get inventory items: %w", err)
+	}
+
+	grpcData := make([]*pb.Product, 0)
+	for _, product := range paginatedData.Data {
+		grpcProduct := pb.Product{
+			Id:          product.ID.String(),
+			Name:        product.Name,
+			Description: product.Description,
+			Category: &pb.Category{
+				Id:          string(product.Category.ID),
+				Name:        product.Category.Name,
+				Description: product.Category.Description,
+				CreatedAt:   product.Category.CreatedAt.Format(time.RFC3339),
+				UpdatedAt:   product.Category.UpdatedAt.Format(time.RFC3339),
+			},
+			Price:     product.Price,
+			Quantity:  product.Quantity,
+			Unit:      product.Unit,
+			CreatedAt: product.CreatedAt.Format(time.RFC3339),
+			UpdatedAt: product.UpdatedAt.Format(time.RFC3339),
+		}
+		grpcData = append(grpcData, &grpcProduct)
+	}
+	resp := pb.ListProductsResponse{
+		CurrentPage: int32(paginatedData.CurrentPage),
+		HasNextPage: paginatedData.HasNextPage,
+		PageSize:    int32(paginatedData.PageSize),
+		TotalPages:  int32(paginatedData.TotalPages),
+		Products:    grpcData,
+	}
+
+	return &resp, nil
 }
 
 func StartGRPCServer(grpcPort string, invService application.InventoryService, logger *slog.Logger) error {

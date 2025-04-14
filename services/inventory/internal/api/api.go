@@ -3,7 +3,6 @@ package api
 import (
 	"database/sql"
 	"fmt"
-	"net"
 	"net/http"
 	"time"
 
@@ -15,8 +14,6 @@ import (
 	"github.com/ExonegeS/go-ecom-services-grpc/services/inventory/internal/config"
 
 	"log/slog"
-
-	"google.golang.org/grpc"
 )
 
 type APIServer struct {
@@ -49,21 +46,7 @@ func (s *APIServer) Run() error {
 	loggerMW := middleware.NewLoggerMW(s.logger)
 	MWChain := middleware.NewMiddlewareChain(middleware.RecoveryMW, loggerMW)
 
-	go func() {
-		lis, err := net.Listen("tcp", fmt.Sprintf(":%s", s.cfg.Server.GRPCPort))
-		if err != nil {
-			s.logger.Error("failed to listen for gRPC", "err", err)
-			return
-		}
-
-		grpcServer := grpc.NewServer()
-		grpcserver.NewInventoryServer(invService, s.logger)
-
-		s.logger.Info("gRPC server started", "port", s.cfg.Server.GRPCPort)
-		if err := grpcServer.Serve(lis); err != nil {
-			s.logger.Error("gRPC server error", "err", err)
-		}
-	}()
+	go grpcserver.StartGRPCServer(s.cfg.Server.GRPCPort, invService, s.logger)
 
 	serverAddress := fmt.Sprintf(":%s", s.cfg.Server.Port)
 	s.logger.Info("HTTP server started", "port", s.cfg.Server.Port)

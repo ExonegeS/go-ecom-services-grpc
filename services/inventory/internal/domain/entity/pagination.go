@@ -33,12 +33,13 @@ type PaginationResponse[T any] struct {
 }
 
 func NewPagination(page, pageSize int64, sortBy SortOption) *Pagination {
-	if page == 0 {
+	if page < 1 {
 		page = 1
 	}
-	if pageSize == 0 {
+	if pageSize < 1 {
 		pageSize = 10
 	}
+	sortBy = SortOption(strings.ToLower(string(sortBy)))
 	return &Pagination{
 		Page:     page,
 		PageSize: pageSize,

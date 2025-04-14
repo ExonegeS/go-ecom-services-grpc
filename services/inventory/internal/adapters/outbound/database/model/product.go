@@ -66,6 +66,8 @@ func ModelToInventoryItem(p *Product, c *Category) (*entity.InventoryItem, error
 			ID:          entity.UUID(c.ID),
 			Name:        c.Name,
 			Description: c.Description,
+			CreatedAt:   c.CreatedAt,
+			UpdatedAt:   c.UpdatedAt,
 		}
 	}
 
