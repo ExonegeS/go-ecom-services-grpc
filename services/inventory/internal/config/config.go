@@ -15,8 +15,9 @@ type Config struct {
 }
 
 type Server struct {
-	Address string
-	Port    string
+	Address  string
+	Port     string
+	GRPCPort string
 }
 
 type DataBase struct {
@@ -38,8 +39,9 @@ func NewConfig(filename string) Config {
 		Environment: getEnv("ENVIRONMENT", "development"),
 		Version:     getEnv("VERSION", "v1"),
 		Server: Server{
-			Address: getEnv("ADDRESS", ""),
-			Port:    getEnv("PORT", "8080"),
+			Address:  getEnv("ADDRESS", ""),
+			Port:     getEnv("PORT", "8080"),
+			GRPCPort: getEnv("GRPC_PORT", "5050"),
 		},
 		DB: DataBase{
 			DBUser:     getEnv("DB_USER", "admin"),

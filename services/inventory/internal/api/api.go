@@ -3,9 +3,11 @@ package api
 import (
 	"database/sql"
 	"fmt"
+	"net"
 	"net/http"
 	"time"
 
+	"github.com/ExonegeS/go-ecom-services-grpc/services/inventory/internal/adapters/inbound/grpcserver"
 	"github.com/ExonegeS/go-ecom-services-grpc/services/inventory/internal/adapters/inbound/rest"
 	"github.com/ExonegeS/go-ecom-services-grpc/services/inventory/internal/adapters/inbound/rest/middleware"
 	"github.com/ExonegeS/go-ecom-services-grpc/services/inventory/internal/adapters/outbound/database"
@@ -13,6 +15,8 @@ import (
 	"github.com/ExonegeS/go-ecom-services-grpc/services/inventory/internal/config"
 
 	"log/slog"
+
+	"google.golang.org/grpc"
 )
 
 type APIServer struct {
@@ -46,7 +50,23 @@ func (s *APIServer) Run() error {
 	_ = loggerMW
 	MWChain := middleware.NewMiddlewareChain()
 
+	go func() {
+		lis, err := net.Listen("tcp", fmt.Sprintf(":%s", s.cfg.Server.GRPCPort))
+		if err != nil {
+			s.logger.Error("failed to listen for gRPC", "err", err)
+			return
+		}
+
+		grpcServer := grpc.NewServer()
+		grpcserver.NewInventoryServer(invService, s.logger)
+
+		s.logger.Info("gRPC server started", "port", s.cfg.Server.GRPCPort)
+		if err := grpcServer.Serve(lis); err != nil {
+			s.logger.Error("gRPC server error", "err", err)
+		}
+	}()
+
 	serverAddress := fmt.Sprintf(":%s", s.cfg.Server.Port)
-	s.logger.Info("STARTING INVENTORY SERVICE", "Environment", s.cfg.Environment, "Version", s.cfg.Version, "Host", serverAddress)
+	s.logger.Info("HTTP server started", "port", s.cfg.Server.Port)
 	return http.ListenAndServe(serverAddress, MWChain(s.mux))
 }
