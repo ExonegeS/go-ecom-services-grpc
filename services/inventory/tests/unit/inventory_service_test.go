@@ -51,6 +51,12 @@ func (m mockInventoryRepository) UpdateCategoryByID(ctx context.Context, id enti
 func (m mockInventoryRepository) DeleteCategoryByID(ctx context.Context, id entity.UUID) error {
 	return nil
 }
+func (m mockInventoryRepository) GetAllCategories(ctx context.Context, pagination *entity.Pagination) ([]*entity.Category, error) {
+	return nil, nil
+}
+func (m *mockInventoryRepository) GetTotalCategoriesCount(ctx context.Context) (int64, error) {
+	return 0, nil
+}
 
 func TestGetInventoryItemByID_Success(t *testing.T) {
 	expectedItem := &entity.InventoryItem{
