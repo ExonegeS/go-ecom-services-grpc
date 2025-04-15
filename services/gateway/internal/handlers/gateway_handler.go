@@ -51,7 +51,6 @@ func NewGatewayHandler(service *config.Service, pool *clients.GrpcClientPool) *G
 	parser.RequestTypeRegistry["UpdateCategoryRequest"] = &pb.UpdateCategoryRequest{}
 	parser.RequestTypeRegistry["DeleteCategoryRequest"] = &pb.DeleteCategoryRequest{}
 	parser.RequestTypeRegistry["ListCategoriesRequest"] = &pb.ListCategoriesRequest{}
-	// Register other request types...
 
 	return &GatewayHandler{
 		service:     service,
