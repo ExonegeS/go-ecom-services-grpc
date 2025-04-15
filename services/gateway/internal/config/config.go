@@ -14,9 +14,10 @@ type Config struct {
 
 type Service struct {
 	Name       string
-	URLBase    string
+	GrpcAddr   string
 	ApiVersion string
 	Status     string
+	Routes     []RouteConfig
 }
 
 func NewConfig() Config {
@@ -26,17 +27,60 @@ func NewConfig() Config {
 		Version:     getEnv("VERSION", "v1"),
 		Services: []Service{
 			{
-				Name:       "inventory service",
-				URLBase:    getEnv("INVENTORY_SERVICE_URL", "http://localhost:8081"),
-				ApiVersion: getEnv("INVENTORY_SERVICE_API_VERSION", "v1"),
+				Name:       "InventoryService",
+				GrpcAddr:   getEnv("INVENTORY_GRPC_ADDR", "localhost:50051"),
+				ApiVersion: "v1",
 				Status:     "down",
+				Routes: []RouteConfig{
+					{
+						Method:      "GET",
+						Path:        "/inventory",
+						GRPCService: "InventoryService",
+						GRPCMethod:  "ListProducts",
+						RequestType: "ListProductsRequest",
+						QueryParams: []string{"Page", "PageSize", "SortBy"},
+					},
+					{
+						Method:      "GET",
+						Path:        "/inventory/{id}",
+						GRPCService: "InventoryService",
+						GRPCMethod:  "GetProductByID",
+						RequestType: "GetProductRequest",
+						PathParams:  []string{"Id"},
+					},
+					{
+						Method:      "POST",
+						Path:        "/inventory",
+						GRPCService: "InventoryService",
+						GRPCMethod:  "CreateProduct",
+						RequestType: "CreateProductRequest",
+					},
+					{
+						Method:      "PUT",
+						Path:        "/inventory/{id}",
+						GRPCService: "InventoryService",
+						GRPCMethod:  "UpdateProduct",
+						RequestType: "UpdateProductRequest",
+						PathParams:  []string{"id"},
+					},
+					{
+						Method:      "DELETE",
+						Path:        "/inventory/{id}",
+						GRPCService: "InventoryService",
+						GRPCMethod:  "DeleteProduct",
+						RequestType: "DeleteProductRequest",
+						PathParams:  []string{"Id"},
+					},
+					{
+						Method:      "GET",
+						Path:        "/categories",
+						GRPCService: "InventoryService",
+						GRPCMethod:  "ListCategories",
+						RequestType: "ListCategoriesRequest",
+					},
+				},
 			},
-			{
-				Name:       "orders service",
-				URLBase:    getEnv("ORDERS_SERVICE_URL", "http://localhost:8082"),
-				ApiVersion: getEnv("ORDERS_SERVICE_API_VERSION", "v1"),
-				Status:     "down",
-			},
+			// Orders service configuration
 		},
 		CorsURLs: getEnv("CORS_URLS", "*"),
 	}

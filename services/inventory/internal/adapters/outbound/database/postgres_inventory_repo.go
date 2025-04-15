@@ -250,7 +250,6 @@ func (r *postgresInventoryRepository) GetAllInventoryItems(ctx context.Context, 
 	entities := make([]*entity.InventoryItem, 0, len(modelItems))
 	for _, m := range modelItems {
 		c, err := r.fetchCategoryData(ctx, entity.UUID(m.CategoryID.String))
-		fmt.Println(c)
 		cPtr := &c
 		if err != nil {
 			cPtr = nil

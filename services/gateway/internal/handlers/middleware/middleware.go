@@ -2,10 +2,15 @@ package middleware
 
 import (
 	"context"
+	"encoding/json"
 	"log/slog"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/gorilla/mux"
+	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/proto"
 )
 
 type Middleware func(next http.Handler) http.Handler
@@ -96,4 +101,43 @@ func RecoveryMW(next http.Handler) http.Handler {
 		}()
 		next.ServeHTTP(w, r)
 	})
+}
+
+func RequestValidator(msg proto.Message) mux.MiddlewareFunc {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.ContentLength == 0 {
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			// Clone prototype to avoid mutation
+			clone := proto.Clone(msg)
+
+			decoder := protojson.UnmarshalOptions{
+				DiscardUnknown: true,
+			}
+
+			var body []byte
+			json.NewDecoder(r.Body).Decode(&body)
+			if err := decoder.Unmarshal(body, clone); err != nil {
+				http.Error(w, "Invalid request format", http.StatusBadRequest)
+				return
+			}
+
+			// Add validation logic here using protoc-gen-validate
+			if validator, ok := clone.(interface {
+				Validate() error
+			}); ok {
+				if err := validator.Validate(); err != nil {
+					http.Error(w, err.Error(), http.StatusBadRequest)
+					return
+				}
+			}
+
+			// Store validated message in context
+			ctx := context.WithValue(r.Context(), "validated_request", clone)
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	}
 }

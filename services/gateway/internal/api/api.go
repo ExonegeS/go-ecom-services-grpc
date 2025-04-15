@@ -1,46 +1,63 @@
 package api
 
 import (
-	"encoding/json"
+	"context"
 	"fmt"
-	"io"
 	"log/slog"
 	"net/http"
 	"time"
 
+	"github.com/ExonegeS/go-ecom-services-grpc/services/gateway/internal/clients"
 	"github.com/ExonegeS/go-ecom-services-grpc/services/gateway/internal/config"
 	"github.com/ExonegeS/go-ecom-services-grpc/services/gateway/internal/handlers"
 	"github.com/ExonegeS/go-ecom-services-grpc/services/gateway/internal/handlers/middleware"
+	"github.com/gorilla/mux"
+	"google.golang.org/grpc/health/grpc_health_v1"
 )
 
 type APIServer struct {
-	mux    *http.ServeMux
-	cfg    config.Config
-	logger *slog.Logger
+	router      *mux.Router
+	cfg         config.Config
+	logger      *slog.Logger
+	clientPools map[string]*clients.GrpcClientPool
 }
 
-func NewAPIServer(mux *http.ServeMux, config config.Config, logger *slog.Logger) *APIServer {
-	return &APIServer{mux, config, logger}
+func NewAPIServer(router *mux.Router, config config.Config, logger *slog.Logger) *APIServer {
+	return &APIServer{
+		router:      router,
+		cfg:         config,
+		logger:      logger,
+		clientPools: make(map[string]*clients.GrpcClientPool),
+	}
 }
 
 func (s *APIServer) Run() error {
+	for _, svc := range s.cfg.Services {
+		s.clientPools[svc.Name] = clients.NewGrpcClientPool(svc.GrpcAddr)
+	}
+
 	for i := range s.cfg.Services {
 		svc := &s.cfg.Services[i]
-		s.logger.Info("Connecting to service", "service", svc.Name, "URLBase", svc.URLBase)
-		handlers.NewHandler(svc).RegisterEndpoints(s.mux)
+		s.logger.Info("Registering service", "service", svc.Name)
+		handlers.NewGatewayHandler(svc, s.clientPools[svc.Name]).RegisterRoutes(s.router)
 	}
 
 	go s.startHealthWorkers()
 
-	timeoutMW := middleware.NewTimeoutContextMW(15)
-	loggerMW := middleware.NewLoggerMW(s.logger)
-	CORS_MW := middleware.NewCORS(s.cfg.CorsURLs)
-	MWChain := middleware.NewMiddlewareChain(middleware.RecoveryMW, CORS_MW, loggerMW, timeoutMW)
+	MWChain := middleware.NewMiddlewareChain(
+		middleware.RecoveryMW,
+		middleware.NewCORS(s.cfg.CorsURLs),
+		middleware.NewLoggerMW(s.logger),
+		middleware.NewTimeoutContextMW(15),
+	)
 
 	serverAddress := fmt.Sprintf(":%s", s.cfg.Port)
 	s.logger.Info("STARTING GATEWAY SERVICE", "Environment", s.cfg.Environment, "Version", s.cfg.Version, "Host", serverAddress)
 
-	return http.ListenAndServe(serverAddress, MWChain(s.mux))
+	return http.ListenAndServe(
+		fmt.Sprintf(":%s", s.cfg.Port),
+		MWChain(s.router),
+	)
 }
 
 func (s *APIServer) startHealthWorkers() {
@@ -49,32 +66,38 @@ func (s *APIServer) startHealthWorkers() {
 		go func(svc *config.Service) {
 			ticker := time.NewTicker(10 * time.Second)
 			defer ticker.Stop()
+
 			for {
-				url := fmt.Sprintf("%s/api/%s/health", svc.URLBase, svc.ApiVersion)
-				resp, err := http.Get(url)
+				pool, exists := s.clientPools[svc.Name]
+				if !exists {
+					s.logger.Error("No client pool for service", "service", svc.Name)
+					<-ticker.C
+					continue
+				}
+
+				conn, err := pool.GetConn()
 				if err != nil {
 					svc.Status = "down"
-					s.logger.Error("Health check failed", "service", svc.Name, "error", err)
-				} else {
-					if resp.StatusCode == http.StatusOK {
-						svc.Status = "up"
-					} else {
-						svc.Status = "down"
-						body, err := io.ReadAll(resp.Body)
-
-						if err != nil {
-							s.logger.Error("Failed to read response body", "service", svc.Name, "error", err)
-						} else {
-							var response map[string]interface{}
-							if err := json.Unmarshal(body, &response); err != nil {
-								s.logger.Error("Failed to unmarshal response body", "service", svc.Name, "error", err)
-							} else {
-								s.logger.Info("Health check response", "service", svc.Name, "response", response)
-							}
-						}
-					}
-					resp.Body.Close()
+					s.logger.Error("gRPC connection failed", "service", svc.Name, "address", svc.GrpcAddr, "error", err)
+					<-ticker.C
+					continue
 				}
+
+				healthClient := grpc_health_v1.NewHealthClient(conn)
+				resp, err := healthClient.Check(context.Background(), &grpc_health_v1.HealthCheckRequest{
+					Service: svc.Name,
+				})
+
+				if err == nil || resp == nil {
+					svc.Status = "up"
+				} else {
+					svc.Status = "down"
+					s.logger.Error("Service health check failed",
+						"service", svc.Name,
+						"status", resp,
+						"error", err)
+				}
+
 				<-ticker.C
 			}
 		}(svc)

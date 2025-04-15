@@ -2,12 +2,12 @@ package main
 
 import (
 	"log"
-	"net/http"
 	"os"
 
 	"github.com/ExonegeS/go-ecom-services-grpc/services/gateway/internal/api"
 	"github.com/ExonegeS/go-ecom-services-grpc/services/gateway/internal/config"
 	"github.com/ExonegeS/prettyslog"
+	"github.com/gorilla/mux"
 )
 
 func main() {
@@ -15,9 +15,9 @@ func main() {
 	cfg := config.NewConfig()
 	logger := prettyslog.SetupPrettySlog(os.Stdout)
 
-	mux := http.NewServeMux()
+	router := mux.NewRouter()
 	// Start the server
-	server := api.NewAPIServer(mux, cfg, logger)
+	server := api.NewAPIServer(router, cfg, logger)
 	if err := server.Run(); err != nil {
 		log.Fatal(err)
 	}

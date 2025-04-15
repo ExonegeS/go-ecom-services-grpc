@@ -1,0 +1,129 @@
+syntax = "proto3";
+
+package inventory;
+
+option go_package = "internal/adapters/inbound/grpc;grpc";
+
+service InventoryService {
+  rpc CreateProduct(CreateProductRequest) returns (ProductResponse);
+  rpc GetProductByID(GetProductRequest) returns (ProductResponse);
+  rpc UpdateProduct(UpdateProductRequest) returns (ProductResponse);
+  rpc DeleteProduct(DeleteProductRequest) returns (ProductResponse);
+  rpc ListProducts(ListProductsRequest) returns (ListProductsResponse);
+
+  rpc CreateCategory(CreateCategoryRequest) returns (CategoryResponse);
+  rpc GetCategoryByID(GetCategoryRequest) returns (CategoryResponse);
+  rpc UpdateCategory(UpdateCategoryRequest) returns (CategoryResponse);
+  rpc DeleteCategory(DeleteCategoryRequest) returns (CategoryResponse);
+  rpc ListCategories(ListCategoriesRequest) returns (ListCategoriesResponse);
+}
+
+message Product {
+  string id = 1;
+  string name = 2;
+  string description = 3;
+  Category category = 4;
+  double price = 5;
+  double quantity = 6;
+  string unit = 7;
+  string created_at = 8;
+  string updated_at = 9;
+}
+
+message Category {
+  string id = 1;
+  string name = 2;
+  string description = 3;
+  string created_at = 4;
+  string updated_at = 5;
+}
+
+// Request/Response messages
+message CreateProductRequest {
+  string name = 1;
+  string description = 2;
+  string category_id = 3;
+  double price = 4;
+  double quantity = 5;
+  string unit = 6;
+}
+
+message GetProductRequest {
+  string id = 1;
+}
+
+message UpdateProductRequest {
+  string id = 1;
+  optional string name = 2;
+  optional string description = 3;
+  optional string category_id = 4;
+  optional double price = 5;
+  optional double quantity = 6;
+  optional string unit = 7;
+}
+
+message DeleteProductRequest {
+  string id = 1;
+}
+
+message ListProductsRequest {
+  int32 page = 1;
+  int32 page_size = 2;
+  string sort_by = 3;
+}
+
+// Categories
+
+message CreateCategoryRequest {
+  string name = 1;
+  string description = 2;
+}
+
+message GetCategoryRequest {
+  string id = 1;
+}
+
+message UpdateCategoryRequest {
+  string id = 1;
+  optional string name = 2;
+  optional string description = 3;
+}
+
+message DeleteCategoryRequest {
+  string id = 1;
+}
+
+message ListCategoriesRequest {
+  int32 page = 1;
+  int32 page_size = 2;
+  string sort_by = 3;
+}
+
+
+
+message ListProductsResponse {
+  int32 current_page = 1;
+  bool has_next_page = 2;
+  int32 page_size = 3;
+  int32 total_pages = 4;
+  repeated Product products = 5;
+}
+
+message ProductResponse {
+  Product product = 1;
+}
+
+message CategoryResponse {
+  Category category = 1;
+}
+
+message ListCategoriesResponse {
+  int32 current_page = 1;
+  bool has_next_page = 2;
+  int32 page_size = 3;
+  int32 total_pages = 4;
+  repeated Category categories = 5;
+}
+
+
+message Empty {}

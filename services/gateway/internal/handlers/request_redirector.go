@@ -5,7 +5,6 @@ import (
 	"net/http"
 
 	"github.com/ExonegeS/go-ecom-services-grpc/services/gateway/internal/config"
-	"github.com/ExonegeS/go-ecom-services-grpc/services/gateway/internal/handlers/middleware"
 )
 
 type Handler struct {
@@ -31,41 +30,41 @@ func (h *Handler) RegisterEndpoints(mux *http.ServeMux) {
 }
 
 func handleInventory(addPrefix func(method, path string) string, svc *config.Service, mux *http.ServeMux) {
-	mux.HandleFunc(addPrefix("POST", "/inventory"), middleware.ReverseProxyHandler(svc, svc.URLBase))
-	mux.HandleFunc(addPrefix("POST", "/inventory/"), middleware.ReverseProxyHandler(svc, svc.URLBase))
+	// mux.HandleFunc(addPrefix("POST", "/inventory"), middleware.ReverseProxyHandler(svc, svc.URLBase))
+	// mux.HandleFunc(addPrefix("POST", "/inventory/"), middleware.ReverseProxyHandler(svc, svc.URLBase))
 
-	mux.HandleFunc(addPrefix("GET", "/inventory"), middleware.ReverseProxyHandler(svc, svc.URLBase))
-	mux.HandleFunc(addPrefix("GET", "/inventory/"), middleware.ReverseProxyHandler(svc, svc.URLBase))
+	// mux.HandleFunc(addPrefix("GET", "/inventory"), middleware.ReverseProxyHandler(svc, svc.URLBase))
+	// mux.HandleFunc(addPrefix("GET", "/inventory/"), middleware.ReverseProxyHandler(svc, svc.URLBase))
 
-	mux.HandleFunc(addPrefix("GET", "/inventory/{id}"), middleware.ReverseProxyHandler(svc, svc.URLBase))
-	mux.HandleFunc(addPrefix("GET", "/inventory/{id}/"), middleware.ReverseProxyHandler(svc, svc.URLBase))
+	// mux.HandleFunc(addPrefix("GET", "/inventory/{id}"), middleware.ReverseProxyHandler(svc, svc.URLBase))
+	// mux.HandleFunc(addPrefix("GET", "/inventory/{id}/"), middleware.ReverseProxyHandler(svc, svc.URLBase))
 
-	mux.HandleFunc(addPrefix("PUT", "/inventory/{id}"), middleware.ReverseProxyHandler(svc, svc.URLBase))
-	mux.HandleFunc(addPrefix("PUT", "/inventory/{id}/"), middleware.ReverseProxyHandler(svc, svc.URLBase))
+	// mux.HandleFunc(addPrefix("PUT", "/inventory/{id}"), middleware.ReverseProxyHandler(svc, svc.URLBase))
+	// mux.HandleFunc(addPrefix("PUT", "/inventory/{id}/"), middleware.ReverseProxyHandler(svc, svc.URLBase))
 
-	mux.HandleFunc(addPrefix("DELETE", "/inventory/{id}"), middleware.ReverseProxyHandler(svc, svc.URLBase))
-	mux.HandleFunc(addPrefix("DELETE", "/inventory/{id}/"), middleware.ReverseProxyHandler(svc, svc.URLBase))
+	// mux.HandleFunc(addPrefix("DELETE", "/inventory/{id}"), middleware.ReverseProxyHandler(svc, svc.URLBase))
+	// mux.HandleFunc(addPrefix("DELETE", "/inventory/{id}/"), middleware.ReverseProxyHandler(svc, svc.URLBase))
 
-	mux.HandleFunc(addPrefix("POST", "/discounts"), middleware.ReverseProxyHandler(svc, svc.URLBase))
-	mux.HandleFunc(addPrefix("DELETE", "/discounts/"), middleware.ReverseProxyHandler(svc, svc.URLBase))
+	// mux.HandleFunc(addPrefix("POST", "/discounts"), middleware.ReverseProxyHandler(svc, svc.URLBase))
+	// mux.HandleFunc(addPrefix("DELETE", "/discounts/"), middleware.ReverseProxyHandler(svc, svc.URLBase))
 
-	mux.HandleFunc(addPrefix("DELETE", "/discounts/{id}"), middleware.ReverseProxyHandler(svc, svc.URLBase))
-	mux.HandleFunc(addPrefix("DELETE", "/discounts/{id}/"), middleware.ReverseProxyHandler(svc, svc.URLBase))
+	// mux.HandleFunc(addPrefix("DELETE", "/discounts/{id}"), middleware.ReverseProxyHandler(svc, svc.URLBase))
+	// mux.HandleFunc(addPrefix("DELETE", "/discounts/{id}/"), middleware.ReverseProxyHandler(svc, svc.URLBase))
 }
 
 func handleOrders(addPrefix func(method, path string) string, svc *config.Service, mux *http.ServeMux) {
-	mux.HandleFunc(addPrefix("POST", "/orders"), middleware.ReverseProxyHandler(svc, svc.URLBase))
-	mux.HandleFunc(addPrefix("POST", "/orders/"), middleware.ReverseProxyHandler(svc, svc.URLBase))
+	// mux.HandleFunc(addPrefix("POST", "/orders"), middleware.ReverseProxyHandler(svc, svc.URLBase))
+	// mux.HandleFunc(addPrefix("POST", "/orders/"), middleware.ReverseProxyHandler(svc, svc.URLBase))
 
-	mux.HandleFunc(addPrefix("GET", "/orders"), middleware.ReverseProxyHandler(svc, svc.URLBase))
-	mux.HandleFunc(addPrefix("GET", "/orders/"), middleware.ReverseProxyHandler(svc, svc.URLBase))
+	// mux.HandleFunc(addPrefix("GET", "/orders"), middleware.ReverseProxyHandler(svc, svc.URLBase))
+	// mux.HandleFunc(addPrefix("GET", "/orders/"), middleware.ReverseProxyHandler(svc, svc.URLBase))
 
-	mux.HandleFunc(addPrefix("GET", "/orders/{id}"), middleware.ReverseProxyHandler(svc, svc.URLBase))
-	mux.HandleFunc(addPrefix("GET", "/orders/{id}/"), middleware.ReverseProxyHandler(svc, svc.URLBase))
+	// mux.HandleFunc(addPrefix("GET", "/orders/{id}"), middleware.ReverseProxyHandler(svc, svc.URLBase))
+	// mux.HandleFunc(addPrefix("GET", "/orders/{id}/"), middleware.ReverseProxyHandler(svc, svc.URLBase))
 
-	mux.HandleFunc(addPrefix("PUT", "/orders/{id}"), middleware.ReverseProxyHandler(svc, svc.URLBase))
-	mux.HandleFunc(addPrefix("PUT", "/orders/{id}/"), middleware.ReverseProxyHandler(svc, svc.URLBase))
+	// mux.HandleFunc(addPrefix("PUT", "/orders/{id}"), middleware.ReverseProxyHandler(svc, svc.URLBase))
+	// mux.HandleFunc(addPrefix("PUT", "/orders/{id}/"), middleware.ReverseProxyHandler(svc, svc.URLBase))
 
-	mux.HandleFunc(addPrefix("DELETE", "/orders/{id}"), middleware.ReverseProxyHandler(svc, svc.URLBase))
-	mux.HandleFunc(addPrefix("DELETE", "/orders/{id}/"), middleware.ReverseProxyHandler(svc, svc.URLBase))
+	// mux.HandleFunc(addPrefix("DELETE", "/orders/{id}"), middleware.ReverseProxyHandler(svc, svc.URLBase))
+	// mux.HandleFunc(addPrefix("DELETE", "/orders/{id}/"), middleware.ReverseProxyHandler(svc, svc.URLBase))
 }
