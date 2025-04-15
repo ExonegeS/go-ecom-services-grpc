@@ -49,8 +49,12 @@ func StartGRPCServer(grpcPort string, invService application.InventoryService, l
 func (s *InventoryServer) GetProductByID(ctx context.Context, req *GetProductRequest) (*ProductResponse, error) {
 	s.logger.Info("Received GetProductByID gRPC request", "id", req.GetId())
 	domainID := req.GetId()
+	id, err := utils.ParseUUID(domainID)
+	if err != nil {
+		return nil, err
+	}
 
-	product, err := s.service.GetInventoryItemByID(ctx, entity.UUID(domainID))
+	product, err := s.service.GetInventoryItemByID(ctx, id)
 	if err != nil {
 		s.logger.Error("Error fetching product", "error", err.Error())
 		return nil, fmt.Errorf("failed to get product: %w", err)
