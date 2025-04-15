@@ -1,4 +1,4 @@
-package grpcserver
+package grpc
 
 import (
 	"context"
@@ -13,14 +13,13 @@ import (
 	"google.golang.org/grpc/reflection"
 	"google.golang.org/grpc/status"
 
-	pb "github.com/ExonegeS/go-ecom-services-grpc/services/inventory/internal/adapters/inbound/grpc"
 	"github.com/ExonegeS/go-ecom-services-grpc/services/inventory/internal/application"
 	"github.com/ExonegeS/go-ecom-services-grpc/services/inventory/internal/domain/entity"
 	"github.com/ExonegeS/go-ecom-services-grpc/services/inventory/internal/utils"
 )
 
 type InventoryServer struct {
-	pb.UnimplementedInventoryServiceServer
+	UnimplementedInventoryServiceServer
 	service application.InventoryService
 	logger  *slog.Logger
 }
@@ -32,7 +31,22 @@ func NewInventoryServer(service application.InventoryService, logger *slog.Logge
 	}
 }
 
-func (s *InventoryServer) GetProductByID(ctx context.Context, req *pb.GetProductRequest) (*pb.ProductResponse, error) {
+func StartGRPCServer(grpcPort string, invService application.InventoryService, logger *slog.Logger) error {
+	lis, err := net.Listen("tcp", ":"+grpcPort)
+	if err != nil {
+		return fmt.Errorf("failed to listen on port %s: %w", grpcPort, err)
+	}
+
+	grpcServer := grpc.NewServer()
+	invServer := NewInventoryServer(invService, logger)
+	RegisterInventoryServiceServer(grpcServer, invServer)
+	reflection.Register(grpcServer)
+
+	logger.Info("gRPC server listening", "port", grpcPort)
+	return grpcServer.Serve(lis)
+}
+
+func (s *InventoryServer) GetProductByID(ctx context.Context, req *GetProductRequest) (*ProductResponse, error) {
 	s.logger.Info("Received GetProductByID gRPC request", "id", req.GetId())
 	domainID := req.GetId()
 
@@ -42,11 +56,11 @@ func (s *InventoryServer) GetProductByID(ctx context.Context, req *pb.GetProduct
 		return nil, fmt.Errorf("failed to get product: %w", err)
 	}
 
-	respProduct := &pb.Product{
+	respProduct := &Product{
 		Id:          product.ID.String(),
 		Name:        product.Name,
 		Description: product.Description,
-		Category: &pb.Category{
+		Category: &Category{
 			Id:          string(product.Category.ID),
 			Name:        product.Category.Name,
 			Description: product.Category.Description,
@@ -60,10 +74,10 @@ func (s *InventoryServer) GetProductByID(ctx context.Context, req *pb.GetProduct
 		UpdatedAt: product.UpdatedAt.Format(time.RFC3339),
 	}
 
-	return &pb.ProductResponse{Product: respProduct}, nil
+	return &ProductResponse{Product: respProduct}, nil
 }
 
-func ValidateCreateProductRequest(req *pb.CreateProductRequest) error {
+func ValidateCreateProductRequest(req *CreateProductRequest) error {
 	if len(req.Name) == 0 {
 		return status.Error(codes.InvalidArgument, "name cannot be empty")
 	}
@@ -85,7 +99,7 @@ func ValidateCreateProductRequest(req *pb.CreateProductRequest) error {
 	return nil
 }
 
-func (s *InventoryServer) CreateProduct(ctx context.Context, req *pb.CreateProductRequest) (*pb.ProductResponse, error) {
+func (s *InventoryServer) CreateProduct(ctx context.Context, req *CreateProductRequest) (*ProductResponse, error) {
 	s.logger.Info("Received CreateProduct gRPC request")
 	if err := ValidateCreateProductRequest(req); err != nil {
 		return nil, err
@@ -106,11 +120,11 @@ func (s *InventoryServer) CreateProduct(ctx context.Context, req *pb.CreateProdu
 		return nil, err
 	}
 
-	respProduct := &pb.Product{
+	respProduct := &Product{
 		Id:          product.ID.String(),
 		Name:        product.Name,
 		Description: product.Description,
-		Category: &pb.Category{
+		Category: &Category{
 			Id:          string(product.Category.ID),
 			Name:        product.Category.Name,
 			Description: product.Category.Description,
@@ -124,10 +138,10 @@ func (s *InventoryServer) CreateProduct(ctx context.Context, req *pb.CreateProdu
 		UpdatedAt: product.UpdatedAt.Format(time.RFC3339),
 	}
 
-	return &pb.ProductResponse{Product: respProduct}, nil
+	return &ProductResponse{Product: respProduct}, nil
 }
 
-func ValidateUpdateProductRequest(req *pb.UpdateProductRequest) error {
+func ValidateUpdateProductRequest(req *UpdateProductRequest) error {
 	if req.Name == nil && req.Description == nil && req.CategoryId == nil &&
 		req.Price == nil && req.Quantity == nil && req.Unit == nil {
 		return status.Error(codes.InvalidArgument, "at least one field must be provided")
@@ -155,7 +169,7 @@ func ValidateUpdateProductRequest(req *pb.UpdateProductRequest) error {
 	return nil
 }
 
-func (s *InventoryServer) UpdateProduct(ctx context.Context, req *pb.UpdateProductRequest) (*pb.ProductResponse, error) {
+func (s *InventoryServer) UpdateProduct(ctx context.Context, req *UpdateProductRequest) (*ProductResponse, error) {
 	s.logger.Info("Received UpdateProduct gRPC request", "id", req.GetId())
 	id, err := utils.ParseUUID(req.GetId())
 	if err != nil {
@@ -178,11 +192,11 @@ func (s *InventoryServer) UpdateProduct(ctx context.Context, req *pb.UpdateProdu
 		return nil, err
 	}
 
-	respProduct := &pb.Product{
+	respProduct := &Product{
 		Id:          id.String(),
 		Name:        product.Name,
 		Description: product.Description,
-		Category: &pb.Category{
+		Category: &Category{
 			Id:          string(product.Category.ID),
 			Name:        product.Category.Name,
 			Description: product.Category.Description,
@@ -196,10 +210,10 @@ func (s *InventoryServer) UpdateProduct(ctx context.Context, req *pb.UpdateProdu
 		UpdatedAt: product.UpdatedAt.Format(time.RFC3339),
 	}
 
-	return &pb.ProductResponse{Product: respProduct}, nil
+	return &ProductResponse{Product: respProduct}, nil
 }
 
-func (s *InventoryServer) DeleteProduct(ctx context.Context, req *pb.DeleteProductRequest) (*pb.ProductResponse, error) {
+func (s *InventoryServer) DeleteProduct(ctx context.Context, req *DeleteProductRequest) (*ProductResponse, error) {
 	s.logger.Info("Received DeleteProduct gRPC request", "id", req.GetId())
 	id, err := utils.ParseUUID(req.GetId())
 	if err != nil {
@@ -211,11 +225,11 @@ func (s *InventoryServer) DeleteProduct(ctx context.Context, req *pb.DeleteProdu
 		return nil, err
 	}
 
-	respProduct := &pb.Product{
+	respProduct := &Product{
 		Id:          id.String(),
 		Name:        product.Name,
 		Description: product.Description,
-		Category: &pb.Category{
+		Category: &Category{
 			Id:          string(product.Category.ID),
 			Name:        product.Category.Name,
 			Description: product.Category.Description,
@@ -229,10 +243,10 @@ func (s *InventoryServer) DeleteProduct(ctx context.Context, req *pb.DeleteProdu
 		UpdatedAt: product.UpdatedAt.Format(time.RFC3339),
 	}
 
-	return &pb.ProductResponse{Product: respProduct}, nil
+	return &ProductResponse{Product: respProduct}, nil
 }
 
-func (s *InventoryServer) ListProducts(ctx context.Context, req *pb.ListProductsRequest) (*pb.ListProductsResponse, error) {
+func (s *InventoryServer) ListProducts(ctx context.Context, req *ListProductsRequest) (*ListProductsResponse, error) {
 	s.logger.Info("Received ListProducts gRPC request", "page", req.GetPage(), "page_size", req.GetPageSize(), "sort_by", req.GetSortBy())
 	pagination := entity.NewPagination(int64(req.GetPage()), int64(req.GetPageSize()), entity.SortOption(req.GetSortBy()))
 	paginatedData, err := s.service.GetPaginatedInventoryItems(ctx, pagination)
@@ -241,13 +255,13 @@ func (s *InventoryServer) ListProducts(ctx context.Context, req *pb.ListProducts
 		return nil, fmt.Errorf("failed to get inventory items: %w", err)
 	}
 
-	grpcData := make([]*pb.Product, 0)
+	grpcData := make([]*Product, 0)
 	for _, product := range paginatedData.Data {
-		grpcProduct := pb.Product{
+		grpcProduct := Product{
 			Id:          product.ID.String(),
 			Name:        product.Name,
 			Description: product.Description,
-			Category: &pb.Category{
+			Category: &Category{
 				Id:          string(product.Category.ID),
 				Name:        product.Category.Name,
 				Description: product.Category.Description,
@@ -262,7 +276,7 @@ func (s *InventoryServer) ListProducts(ctx context.Context, req *pb.ListProducts
 		}
 		grpcData = append(grpcData, &grpcProduct)
 	}
-	resp := pb.ListProductsResponse{
+	resp := ListProductsResponse{
 		CurrentPage: int32(paginatedData.CurrentPage),
 		HasNextPage: paginatedData.HasNextPage,
 		PageSize:    int32(paginatedData.PageSize),
@@ -273,7 +287,7 @@ func (s *InventoryServer) ListProducts(ctx context.Context, req *pb.ListProducts
 	return &resp, nil
 }
 
-func (s *InventoryServer) CreateCategory(ctx context.Context, req *pb.CreateCategoryRequest) (*pb.CategoryResponse, error) {
+func (s *InventoryServer) CreateCategory(ctx context.Context, req *CreateCategoryRequest) (*CategoryResponse, error) {
 	s.logger.Info("Received CreateCategory gRPC request")
 
 	if err := ValidateCreateCategoryRequest(req); err != nil {
@@ -291,12 +305,12 @@ func (s *InventoryServer) CreateCategory(ctx context.Context, req *pb.CreateCate
 		return nil, status.Error(codes.Internal, "failed to create category")
 	}
 
-	return &pb.CategoryResponse{
+	return &CategoryResponse{
 		Category: convertDomainCategoryToPB(&category),
 	}, nil
 }
 
-func (s *InventoryServer) GetCategoryByID(ctx context.Context, req *pb.GetCategoryRequest) (*pb.CategoryResponse, error) {
+func (s *InventoryServer) GetCategoryByID(ctx context.Context, req *GetCategoryRequest) (*CategoryResponse, error) {
 	s.logger.Info("Received GetCategoryByID gRPC request", "id", req.GetId())
 
 	categoryID, err := utils.ParseUUID(req.GetId())
@@ -313,12 +327,12 @@ func (s *InventoryServer) GetCategoryByID(ctx context.Context, req *pb.GetCatego
 		return nil, status.Error(codes.Internal, "failed to get category")
 	}
 
-	return &pb.CategoryResponse{
+	return &CategoryResponse{
 		Category: convertDomainCategoryToPB(category),
 	}, nil
 }
 
-func (s *InventoryServer) UpdateCategory(ctx context.Context, req *pb.UpdateCategoryRequest) (*pb.CategoryResponse, error) {
+func (s *InventoryServer) UpdateCategory(ctx context.Context, req *UpdateCategoryRequest) (*CategoryResponse, error) {
 	s.logger.Info("Received UpdateCategory gRPC request", "id", req.GetId())
 
 	if err := ValidateUpdateCategoryRequest(req); err != nil {
@@ -344,12 +358,12 @@ func (s *InventoryServer) UpdateCategory(ctx context.Context, req *pb.UpdateCate
 		return nil, status.Error(codes.Internal, "failed to update category")
 	}
 
-	return &pb.CategoryResponse{
+	return &CategoryResponse{
 		Category: convertDomainCategoryToPB(updatedCategory),
 	}, nil
 }
 
-func (s *InventoryServer) DeleteCategory(ctx context.Context, req *pb.DeleteCategoryRequest) (*pb.CategoryResponse, error) {
+func (s *InventoryServer) DeleteCategory(ctx context.Context, req *DeleteCategoryRequest) (*CategoryResponse, error) {
 	s.logger.Info("Received DeleteCategory gRPC request", "id", req.GetId())
 
 	categoryID, err := utils.ParseUUID(req.GetId())
@@ -366,12 +380,12 @@ func (s *InventoryServer) DeleteCategory(ctx context.Context, req *pb.DeleteCate
 		return nil, status.Error(codes.Internal, "failed to delete category")
 	}
 
-	return &pb.CategoryResponse{
+	return &CategoryResponse{
 		Category: convertDomainCategoryToPB(deletedCategory),
 	}, nil
 }
 
-func (s *InventoryServer) ListCategories(ctx context.Context, req *pb.ListCategoriesRequest) (*pb.ListCategoriesResponse, error) {
+func (s *InventoryServer) ListCategories(ctx context.Context, req *ListCategoriesRequest) (*ListCategoriesResponse, error) {
 	s.logger.Info("Received ListCategories gRPC request",
 		"page", req.GetPage(),
 		"page_size", req.GetPageSize(),
@@ -390,12 +404,12 @@ func (s *InventoryServer) ListCategories(ctx context.Context, req *pb.ListCatego
 		return nil, status.Error(codes.Internal, "failed to list categories")
 	}
 
-	grpcCategories := make([]*pb.Category, 0, len(paginatedData.Data))
+	grpcCategories := make([]*Category, 0, len(paginatedData.Data))
 	for _, category := range paginatedData.Data {
 		grpcCategories = append(grpcCategories, convertDomainCategoryToPB(category))
 	}
 
-	return &pb.ListCategoriesResponse{
+	return &ListCategoriesResponse{
 		CurrentPage: int32(paginatedData.CurrentPage),
 		HasNextPage: paginatedData.HasNextPage,
 		PageSize:    int32(paginatedData.PageSize),
@@ -404,7 +418,7 @@ func (s *InventoryServer) ListCategories(ctx context.Context, req *pb.ListCatego
 	}, nil
 }
 
-func ValidateCreateCategoryRequest(req *pb.CreateCategoryRequest) error {
+func ValidateCreateCategoryRequest(req *CreateCategoryRequest) error {
 	if len(req.GetName()) == 0 {
 		return status.Error(codes.InvalidArgument, "name cannot be empty")
 	}
@@ -414,7 +428,7 @@ func ValidateCreateCategoryRequest(req *pb.CreateCategoryRequest) error {
 	return nil
 }
 
-func ValidateUpdateCategoryRequest(req *pb.UpdateCategoryRequest) error {
+func ValidateUpdateCategoryRequest(req *UpdateCategoryRequest) error {
 	if req.Name == nil && req.Description == nil {
 		return status.Error(codes.InvalidArgument, "at least one field must be provided")
 	}
@@ -427,27 +441,12 @@ func ValidateUpdateCategoryRequest(req *pb.UpdateCategoryRequest) error {
 	return nil
 }
 
-func convertDomainCategoryToPB(category *entity.Category) *pb.Category {
-	return &pb.Category{
+func convertDomainCategoryToPB(category *entity.Category) *Category {
+	return &Category{
 		Id:          category.ID.String(),
 		Name:        category.Name,
 		Description: category.Description,
 		CreatedAt:   category.CreatedAt.Format(time.RFC3339),
 		UpdatedAt:   category.UpdatedAt.Format(time.RFC3339),
 	}
-}
-
-func StartGRPCServer(grpcPort string, invService application.InventoryService, logger *slog.Logger) error {
-	lis, err := net.Listen("tcp", ":"+grpcPort)
-	if err != nil {
-		return fmt.Errorf("failed to listen on port %s: %w", grpcPort, err)
-	}
-
-	grpcServer := grpc.NewServer()
-	invServer := NewInventoryServer(invService, logger)
-	pb.RegisterInventoryServiceServer(grpcServer, invServer)
-	reflection.Register(grpcServer)
-
-	logger.Info("gRPC server listening", "port", grpcPort)
-	return grpcServer.Serve(lis)
 }

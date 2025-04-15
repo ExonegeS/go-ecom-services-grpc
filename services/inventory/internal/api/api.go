@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/ExonegeS/go-ecom-services-grpc/services/inventory/internal/adapters/inbound/grpcserver"
+	"github.com/ExonegeS/go-ecom-services-grpc/services/inventory/internal/adapters/inbound/grpc"
 	"github.com/ExonegeS/go-ecom-services-grpc/services/inventory/internal/adapters/inbound/rest"
 	"github.com/ExonegeS/go-ecom-services-grpc/services/inventory/internal/adapters/inbound/rest/middleware"
 	"github.com/ExonegeS/go-ecom-services-grpc/services/inventory/internal/adapters/outbound/database"
@@ -46,7 +46,7 @@ func (s *APIServer) Run() error {
 	loggerMW := middleware.NewLoggerMW(s.logger)
 	MWChain := middleware.NewMiddlewareChain(middleware.RecoveryMW, loggerMW)
 
-	go grpcserver.StartGRPCServer(s.cfg.Server.GRPCPort, invService, s.logger)
+	go grpc.StartGRPCServer(s.cfg.Server.GRPCPort, invService, s.logger)
 
 	serverAddress := fmt.Sprintf(":%s", s.cfg.Server.Port)
 	s.logger.Info("HTTP server started", "port", s.cfg.Server.Port)
