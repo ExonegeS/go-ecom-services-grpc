@@ -22,6 +22,8 @@ type InventoryService interface {
 	UpdateCategory(ctx context.Context, id entity.UUID, params UpdateCategoryParams) (*entity.Category, error)
 	DeleteCategory(ctx context.Context, id entity.UUID) (*entity.Category, error)
 	GetPaginatedCategories(ctx context.Context, pagination *entity.Pagination) (*entity.PaginationResponse[*entity.Category], error)
+
+	ReserveProduct(ctx context.Context, id entity.UUID, quantity int64) error
 }
 
 type UpdateInventoryItemParams struct {
@@ -309,5 +311,23 @@ func (s *inventoryService) UpdateInventoryItem(ctx context.Context, id entity.UU
 		itemData = item
 
 		return
+	})
+}
+
+func (s *inventoryService) ReserveProduct(ctx context.Context, id entity.UUID, quantity int64) error {
+	return s.inventoryRepo.UpdateByID(ctx, id, func(item *entity.InventoryItem) (updated bool, err error) {
+		if quantity < 0 {
+			err = entity.ErrInvalidQuantity
+			return
+		}
+		if quantity > int64(item.Quantity) {
+			err = entity.ErrInsufficientQuantity
+			return
+		}
+
+		item.Quantity -= float64(quantity)
+		item.UpdatedAt = s.timeSource().UTC()
+
+		return true, nil
 	})
 }

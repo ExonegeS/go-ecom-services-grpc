@@ -2,21 +2,65 @@ package entity
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
 )
 
-type SortOption string
+type SortOption int
 
 const (
-	SortByID        SortOption = "id"
-	SortByPrice     SortOption = "price"
-	SortByQuantity  SortOption = "quantity"
-	SortByName      SortOption = "name"
-	SortByCreatedAt SortOption = "created_at"
-	SortByUpdatedAt SortOption = "updated_at"
+	SortByUnknown SortOption = iota
+	SortByID
+	SortByPrice
+	SortByQuantity
+	SortByName
+	SortByCreatedAt
+	SortByUpdatedAt
 )
+
+var (
+	ErrInvalidSortBy = fmt.Errorf("invalid SortBy value")
+)
+
+var validSortOptions = map[string]SortOption{
+	"id":         SortByID,
+	"price":      SortByPrice,
+	"quantity":   SortByQuantity,
+	"name":       SortByName,
+	"created_at": SortByCreatedAt,
+	"updated_at": SortByUpdatedAt,
+}
+
+func ParseSortOption(s string) (SortOption, error) {
+	if s == "" {
+		return SortByUnknown, nil
+	}
+	if option, ok := validSortOptions[strings.ToLower(s)]; ok {
+		return option, nil
+	}
+	return SortByUnknown, ErrInvalidSortBy
+}
+
+func (s SortOption) ColumnName() string {
+	switch s {
+	case SortByID:
+		return "id"
+	case SortByPrice:
+		return "price"
+	case SortByQuantity:
+		return "stock_quantity"
+	case SortByName:
+		return "name"
+	case SortByCreatedAt:
+		return "created_at"
+	case SortByUpdatedAt:
+		return "updated_at"
+	default:
+		return ""
+	}
+}
 
 type Pagination struct {
 	Page     int64      `json:"page"`
@@ -39,7 +83,6 @@ func NewPagination(page, pageSize int64, sortBy SortOption) *Pagination {
 	if pageSize < 1 {
 		pageSize = 10
 	}
-	sortBy = SortOption(strings.ToLower(string(sortBy)))
 	return &Pagination{
 		Page:     page,
 		PageSize: pageSize,
@@ -47,11 +90,10 @@ func NewPagination(page, pageSize int64, sortBy SortOption) *Pagination {
 	}
 }
 
-func NewPaginationFromRequest(r *http.Request, validSortByOptions []SortOption) (*Pagination, error) {
+func NewPaginationFromRequest(r *http.Request) (*Pagination, error) {
 	pageStr := r.URL.Query().Get("page")
 	pageSizeStr := r.URL.Query().Get("pageSize")
-	sortBy := r.URL.Query().Get("sortBy")
-
+	sortByStr := r.URL.Query().Get("sortBy")
 	page, pageSize := 1, 10
 
 	if pageStr != "" {
@@ -70,25 +112,10 @@ func NewPaginationFromRequest(r *http.Request, validSortByOptions []SortOption) 
 		pageSize = parsedPageSize
 	}
 
-	pagination := NewPagination(int64(page), int64(pageSize), SortOption(strings.ToLower(sortBy)))
-
-	if !pagination.Validate(validSortByOptions) {
-		return nil, errors.New("invalid sortBy value")
+	sortBy, err := ParseSortOption(sortByStr)
+	if err != nil {
+		return nil, err
 	}
 
-	return pagination, nil
-}
-
-func (p Pagination) Validate(validSortByOptions []SortOption) bool {
-	if p.SortBy == "" {
-		return true
-	}
-
-	for _, option := range validSortByOptions {
-		if strings.ToLower(string(option)) == string(p.SortBy) {
-			return true
-		}
-	}
-
-	return false
+	return NewPagination(int64(page), int64(pageSize), sortBy), nil
 }

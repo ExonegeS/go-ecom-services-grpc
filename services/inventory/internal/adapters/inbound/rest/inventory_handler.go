@@ -210,14 +210,7 @@ func (h *InventoryHandler) CreateInventoryItem(w http.ResponseWriter, r *http.Re
 }
 
 func (h *InventoryHandler) GetPaginatedInventoryItems(w http.ResponseWriter, r *http.Request) {
-	pagination, err := entity.NewPaginationFromRequest(r, []entity.SortOption{
-		entity.SortByID,
-		entity.SortByName,
-		entity.SortByPrice,
-		entity.SortByQuantity,
-		entity.SortByCreatedAt,
-		entity.SortByUpdatedAt,
-	})
+	pagination, err := entity.NewPaginationFromRequest(r)
 	if err != nil {
 		h.logger.Error("Invalid pagination request", "error", err.Error())
 		utils.WriteError(w, http.StatusBadRequest, err)

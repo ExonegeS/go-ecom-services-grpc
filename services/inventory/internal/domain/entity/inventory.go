@@ -49,6 +49,7 @@ var (
 	ErrInvalidPrice          = fmt.Errorf("invalid price")
 	ErrInvalidQuantity       = fmt.Errorf("invalid quantity")
 	ErrInvalidUnit           = fmt.Errorf("invalid unit")
+	ErrInsufficientQuantity  = fmt.Errorf("insufficient stored items")
 )
 
 func (i *InventoryItem) Validate() error {

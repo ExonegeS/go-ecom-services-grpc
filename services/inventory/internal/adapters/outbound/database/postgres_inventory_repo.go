@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strconv"
 
 	"github.com/ExonegeS/go-ecom-services-grpc/services/inventory/internal/adapters/outbound/database/model"
 	"github.com/ExonegeS/go-ecom-services-grpc/services/inventory/internal/domain/entity"
@@ -25,17 +26,17 @@ func (r *postgresInventoryRepository) GetByID(ctx context.Context, id entity.UUI
 	var product model.Product
 	var category model.Category
 	err := r.db.QueryRowContext(ctx,
-		`SELECT 
-			id, 
-			name, 
-			description, 
-			category_id, 
-			price, 
-			stock_quantity, 
-			unit, 
-			created_at, 
-			updated_at 
-		FROM products 
+		`SELECT
+			id,
+			name,
+			description,
+			category_id,
+			price,
+			stock_quantity,
+			unit,
+			created_at,
+			updated_at
+		FROM products
 		WHERE id = $1`, id,
 	).Scan(
 		&product.ID,
@@ -50,19 +51,19 @@ func (r *postgresInventoryRepository) GetByID(ctx context.Context, id entity.UUI
 	)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, model.ErrProductNotFound
+			return nil, entity.ErrItemNotFound
 		}
 		return nil, fmt.Errorf("%s: %w", op, err)
 	}
 	if product.CategoryID.Valid {
 		err = r.db.QueryRowContext(ctx,
-			`SELECT 
-				id, 
-				name, 
-				description, 
-				created_at, 
-				updated_at 
-			FROM categories 
+			`SELECT
+				id,
+				name,
+				description,
+				created_at,
+				updated_at
+			FROM categories
 			WHERE id = $1`, product.CategoryID,
 		).Scan(
 			&category.ID,
@@ -113,15 +114,15 @@ func (r *postgresInventoryRepository) UpdateByID(ctx context.Context, id entity.
 		var product model.Product
 		var category model.Category
 		err := r.db.QueryRowContext(ctx,
-			`SELECT 
-				name, 
-				description, 
+			`SELECT
+				name,
+				description,
 				category_id,
-				price, 
-				stock_quantity, 
-				unit, 
-				created_at 
-			FROM products 
+				price,
+				stock_quantity,
+				unit,
+				created_at
+			FROM products
 			WHERE id = $1 FOR UPDATE`, id,
 		).Scan(
 			&product.Name,
@@ -207,15 +208,12 @@ func (r *postgresInventoryRepository) GetAllInventoryItems(ctx context.Context, 
 		FROM products
 	`
 
-	if pagination.SortBy != "" {
-		if pagination.SortBy == entity.SortByQuantity {
-			pagination.SortBy = "stock_quantity"
-		}
-		query += fmt.Sprintf(" ORDER BY %s", pagination.SortBy)
+	if column := pagination.SortBy.ColumnName(); column != "" {
+		query += " ORDER BY " + column
 	}
 
 	offset := (pagination.Page - 1) * pagination.PageSize
-	query += fmt.Sprintf(" LIMIT %d OFFSET %d", pagination.PageSize, offset)
+	query += " LIMIT " + strconv.FormatInt(pagination.PageSize, 10) + " OFFSET " + strconv.FormatInt(offset, 10)
 
 	rows, err := r.db.QueryContext(ctx, query)
 	if err != nil {
@@ -420,13 +418,12 @@ func (r *postgresInventoryRepository) GetAllCategories(ctx context.Context, pagi
 		SELECT id, name, description, created_at, updated_at
 		FROM categories
 	`
-
-	if pagination.SortBy != "" {
-		query += fmt.Sprintf(" ORDER BY %s", pagination.SortBy)
+	if column := pagination.SortBy.ColumnName(); column != "" {
+		query += " ORDER BY " + column
 	}
 
 	offset := (pagination.Page - 1) * pagination.PageSize
-	query += fmt.Sprintf(" LIMIT %d OFFSET %d", pagination.PageSize, offset)
+	query += " LIMIT " + strconv.FormatInt(pagination.PageSize, 10) + " OFFSET " + strconv.FormatInt(offset, 10)
 
 	rows, err := r.db.QueryContext(ctx, query)
 	if err != nil {

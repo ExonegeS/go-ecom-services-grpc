@@ -6,12 +6,12 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
-	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/reflection"
 	"google.golang.org/grpc/status"
+	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/ExonegeS/go-ecom-services-grpc/services/inventory/internal/application"
 	"github.com/ExonegeS/go-ecom-services-grpc/services/inventory/internal/domain/entity"
@@ -49,15 +49,20 @@ func StartGRPCServer(grpcPort string, invService application.InventoryService, l
 func (s *InventoryServer) GetProductByID(ctx context.Context, req *GetProductRequest) (*ProductResponse, error) {
 	s.logger.Info("Received GetProductByID gRPC request", "id", req.GetId())
 	domainID := req.GetId()
+
 	id, err := utils.ParseUUID(domainID)
 	if err != nil {
-		return nil, err
+		s.logger.Error("Failed to parse product ID", "error", err)
+		return nil, status.Error(codes.InvalidArgument, "invalid product ID format")
 	}
 
 	product, err := s.service.GetInventoryItemByID(ctx, id)
 	if err != nil {
-		s.logger.Error("Error fetching product", "error", err.Error())
-		return nil, fmt.Errorf("failed to get product: %w", err)
+		if errors.Is(err, entity.ErrItemNotFound) {
+			return nil, status.Error(codes.NotFound, "product not found")
+		}
+		s.logger.Error("Failed to get inventory item", "error", err)
+		return nil, status.Error(codes.Internal, "failed to retrieve product")
 	}
 
 	respProduct := &Product{
@@ -68,44 +73,24 @@ func (s *InventoryServer) GetProductByID(ctx context.Context, req *GetProductReq
 			Id:          string(product.Category.ID),
 			Name:        product.Category.Name,
 			Description: product.Category.Description,
-			CreatedAt:   product.Category.CreatedAt.Format(time.RFC3339),
-			UpdatedAt:   product.Category.UpdatedAt.Format(time.RFC3339),
+			CreatedAt:   timestamppb.New(product.Category.CreatedAt),
+			UpdatedAt:   timestamppb.New(product.Category.UpdatedAt),
 		},
 		Price:     product.Price,
 		Quantity:  product.Quantity,
 		Unit:      product.Unit,
-		CreatedAt: product.CreatedAt.Format(time.RFC3339),
-		UpdatedAt: product.UpdatedAt.Format(time.RFC3339),
+		CreatedAt: timestamppb.New(product.CreatedAt),
+		UpdatedAt: timestamppb.New(product.UpdatedAt),
 	}
 
 	return &ProductResponse{Product: respProduct}, nil
 }
 
-func ValidateCreateProductRequest(req *CreateProductRequest) error {
-	if len(req.Name) == 0 {
-		return status.Error(codes.InvalidArgument, "name cannot be empty")
-	}
-	if len(req.Description) == 0 {
-		return status.Error(codes.InvalidArgument, "description cannot be empty")
-	}
-	if _, err := utils.ParseUUID(req.CategoryId); err != nil {
-		return fmt.Errorf("invalid category ID: %w", err)
-	}
-	if req.Price <= 0 {
-		return status.Error(codes.InvalidArgument, "price must be greater than zero")
-	}
-	if req.Quantity <= 0 {
-		return status.Error(codes.InvalidArgument, "quantity must be greater than zero")
-	}
-	if len(req.Unit) == 0 {
-		return status.Error(codes.InvalidArgument, "unit cannot be empty")
-	}
-	return nil
-}
-
 func (s *InventoryServer) CreateProduct(ctx context.Context, req *CreateProductRequest) (*ProductResponse, error) {
 	s.logger.Info("Received CreateProduct gRPC request")
+
 	if err := ValidateCreateProductRequest(req); err != nil {
+		s.logger.Error("Invalid create request", "error", err)
 		return nil, err
 	}
 	product := entity.InventoryItem{
@@ -121,7 +106,11 @@ func (s *InventoryServer) CreateProduct(ctx context.Context, req *CreateProductR
 
 	err := s.service.CreateInventoryItem(ctx, &product)
 	if err != nil {
-		return nil, err
+		if errors.Is(err, entity.ErrCategoryNotFound) {
+			return nil, status.Error(codes.InvalidArgument, "specified category does not exist")
+		}
+		s.logger.Error("Failed to create product", "error", err)
+		return nil, status.Error(codes.Internal, "failed to create product")
 	}
 
 	respProduct := &Product{
@@ -132,17 +121,19 @@ func (s *InventoryServer) CreateProduct(ctx context.Context, req *CreateProductR
 			Id:          string(product.Category.ID),
 			Name:        product.Category.Name,
 			Description: product.Category.Description,
-			CreatedAt:   product.Category.CreatedAt.Format(time.RFC3339),
-			UpdatedAt:   product.Category.UpdatedAt.Format(time.RFC3339),
+			CreatedAt:   timestamppb.New(product.Category.CreatedAt),
+			UpdatedAt:   timestamppb.New(product.Category.UpdatedAt),
 		},
 		Price:     product.Price,
 		Quantity:  product.Quantity,
 		Unit:      product.Unit,
-		CreatedAt: product.CreatedAt.Format(time.RFC3339),
-		UpdatedAt: product.UpdatedAt.Format(time.RFC3339),
+		CreatedAt: timestamppb.New(product.CreatedAt),
+		UpdatedAt: timestamppb.New(product.UpdatedAt),
 	}
 
-	return &ProductResponse{Product: respProduct}, nil
+	return &ProductResponse{
+		Product: respProduct,
+	}, nil
 }
 
 func ValidateUpdateProductRequest(req *UpdateProductRequest) error {
@@ -175,13 +166,18 @@ func ValidateUpdateProductRequest(req *UpdateProductRequest) error {
 
 func (s *InventoryServer) UpdateProduct(ctx context.Context, req *UpdateProductRequest) (*ProductResponse, error) {
 	s.logger.Info("Received UpdateProduct gRPC request", "id", req.GetId())
+
 	id, err := utils.ParseUUID(req.GetId())
 	if err != nil {
-		return nil, err
+		s.logger.Error("Invalid product ID", "error", err)
+		return nil, status.Error(codes.InvalidArgument, "invalid product ID format")
 	}
+
 	if err := ValidateUpdateProductRequest(req); err != nil {
+		s.logger.Error("Invalid update request", "error", err)
 		return nil, err
 	}
+
 	params := application.UpdateInventoryItemParams{
 		Name:        req.Name,
 		Description: req.Description,
@@ -193,7 +189,11 @@ func (s *InventoryServer) UpdateProduct(ctx context.Context, req *UpdateProductR
 
 	product, err := s.service.UpdateInventoryItem(ctx, id, params)
 	if err != nil {
-		return nil, err
+		if errors.Is(err, entity.ErrItemNotFound) {
+			return nil, status.Error(codes.NotFound, "product not found")
+		}
+		s.logger.Error("Failed to update product", "error", err)
+		return nil, status.Error(codes.Internal, "failed to update product")
 	}
 
 	respProduct := &Product{
@@ -204,14 +204,14 @@ func (s *InventoryServer) UpdateProduct(ctx context.Context, req *UpdateProductR
 			Id:          string(product.Category.ID),
 			Name:        product.Category.Name,
 			Description: product.Category.Description,
-			CreatedAt:   product.Category.CreatedAt.Format(time.RFC3339),
-			UpdatedAt:   product.Category.UpdatedAt.Format(time.RFC3339),
+			CreatedAt:   timestamppb.New(product.Category.CreatedAt),
+			UpdatedAt:   timestamppb.New(product.Category.UpdatedAt),
 		},
 		Price:     product.Price,
 		Quantity:  product.Quantity,
 		Unit:      product.Unit,
-		CreatedAt: product.CreatedAt.Format(time.RFC3339),
-		UpdatedAt: product.UpdatedAt.Format(time.RFC3339),
+		CreatedAt: timestamppb.New(product.CreatedAt),
+		UpdatedAt: timestamppb.New(product.UpdatedAt),
 	}
 
 	return &ProductResponse{Product: respProduct}, nil
@@ -219,14 +219,20 @@ func (s *InventoryServer) UpdateProduct(ctx context.Context, req *UpdateProductR
 
 func (s *InventoryServer) DeleteProduct(ctx context.Context, req *DeleteProductRequest) (*ProductResponse, error) {
 	s.logger.Info("Received DeleteProduct gRPC request", "id", req.GetId())
+
 	id, err := utils.ParseUUID(req.GetId())
 	if err != nil {
-		return nil, err
+		s.logger.Error("Invalid product ID", "error", err)
+		return nil, status.Error(codes.InvalidArgument, "invalid product ID format")
 	}
 
 	product, err := s.service.DeleteInventoryItem(ctx, id)
 	if err != nil {
-		return nil, err
+		if errors.Is(err, entity.ErrItemNotFound) {
+			return nil, status.Error(codes.NotFound, "product not found")
+		}
+		s.logger.Error("Failed to delete product", "error", err)
+		return nil, status.Error(codes.Internal, "failed to delete product")
 	}
 
 	respProduct := &Product{
@@ -237,26 +243,42 @@ func (s *InventoryServer) DeleteProduct(ctx context.Context, req *DeleteProductR
 			Id:          string(product.Category.ID),
 			Name:        product.Category.Name,
 			Description: product.Category.Description,
-			CreatedAt:   product.Category.CreatedAt.Format(time.RFC3339),
-			UpdatedAt:   product.Category.UpdatedAt.Format(time.RFC3339),
+			CreatedAt:   timestamppb.New(product.Category.CreatedAt),
+			UpdatedAt:   timestamppb.New(product.Category.UpdatedAt),
 		},
 		Price:     product.Price,
 		Quantity:  product.Quantity,
 		Unit:      product.Unit,
-		CreatedAt: product.CreatedAt.Format(time.RFC3339),
-		UpdatedAt: product.UpdatedAt.Format(time.RFC3339),
+		CreatedAt: timestamppb.New(product.CreatedAt),
+		UpdatedAt: timestamppb.New(product.UpdatedAt),
 	}
 
 	return &ProductResponse{Product: respProduct}, nil
 }
 
 func (s *InventoryServer) ListProducts(ctx context.Context, req *ListProductsRequest) (*ListProductsResponse, error) {
-	s.logger.Info("Received ListProducts gRPC request", "page", req.GetPage(), "page_size", req.GetPageSize(), "sort_by", req.GetSortBy())
-	pagination := entity.NewPagination(int64(req.GetPage()), int64(req.GetPageSize()), entity.SortOption(req.GetSortBy()))
+	s.logger.Info("Received ListProducts gRPC request",
+		"page", req.GetPage(),
+		"page_size", req.GetPageSize(),
+		"sort_by", req.GetSortBy(),
+	)
+
+	sortBy, err := entity.ParseSortOption(req.GetSortBy())
+	if err != nil {
+		s.logger.Error("Invalid sort option", "error", err)
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	pagination := entity.NewPagination(
+		int64(req.GetPage()),
+		int64(req.GetPageSize()),
+		sortBy,
+	)
+
 	paginatedData, err := s.service.GetPaginatedInventoryItems(ctx, pagination)
 	if err != nil {
-		s.logger.Error("Failed to get inventory items", "error", err.Error())
-		return nil, fmt.Errorf("failed to get inventory items: %w", err)
+		s.logger.Error("Failed to list products", "error", err)
+		return nil, status.Error(codes.Internal, "failed to list products")
 	}
 
 	grpcData := make([]*Product, 0)
@@ -269,17 +291,18 @@ func (s *InventoryServer) ListProducts(ctx context.Context, req *ListProductsReq
 				Id:          string(product.Category.ID),
 				Name:        product.Category.Name,
 				Description: product.Category.Description,
-				CreatedAt:   product.Category.CreatedAt.Format(time.RFC3339),
-				UpdatedAt:   product.Category.UpdatedAt.Format(time.RFC3339),
+				CreatedAt:   timestamppb.New(product.Category.CreatedAt),
+				UpdatedAt:   timestamppb.New(product.Category.UpdatedAt),
 			},
 			Price:     product.Price,
 			Quantity:  product.Quantity,
 			Unit:      product.Unit,
-			CreatedAt: product.CreatedAt.Format(time.RFC3339),
-			UpdatedAt: product.UpdatedAt.Format(time.RFC3339),
+			CreatedAt: timestamppb.New(product.CreatedAt),
+			UpdatedAt: timestamppb.New(product.UpdatedAt),
 		}
 		grpcData = append(grpcData, &grpcProduct)
 	}
+
 	resp := ListProductsResponse{
 		CurrentPage: int32(paginatedData.CurrentPage),
 		HasNextPage: paginatedData.HasNextPage,
@@ -295,6 +318,7 @@ func (s *InventoryServer) CreateCategory(ctx context.Context, req *CreateCategor
 	s.logger.Info("Received CreateCategory gRPC request")
 
 	if err := ValidateCreateCategoryRequest(req); err != nil {
+		s.logger.Error("Failed to validate category", "error", err.Error())
 		return nil, err
 	}
 
@@ -319,6 +343,7 @@ func (s *InventoryServer) GetCategoryByID(ctx context.Context, req *GetCategoryR
 
 	categoryID, err := utils.ParseUUID(req.GetId())
 	if err != nil {
+		s.logger.Error("Failed to parse category id", "error", err.Error())
 		return nil, status.Error(codes.InvalidArgument, "invalid category ID format")
 	}
 
@@ -327,7 +352,7 @@ func (s *InventoryServer) GetCategoryByID(ctx context.Context, req *GetCategoryR
 		if errors.Is(err, entity.ErrCategoryNotFound) {
 			return nil, status.Error(codes.NotFound, "category not found")
 		}
-		s.logger.Error("Error fetching category", "error", err.Error())
+		s.logger.Error("Failed to GetCategoryByID", "error", err.Error())
 		return nil, status.Error(codes.Internal, "failed to get category")
 	}
 
@@ -340,11 +365,13 @@ func (s *InventoryServer) UpdateCategory(ctx context.Context, req *UpdateCategor
 	s.logger.Info("Received UpdateCategory gRPC request", "id", req.GetId())
 
 	if err := ValidateUpdateCategoryRequest(req); err != nil {
+		s.logger.Error("Failed to ValidateUpdateCategoryRequest", "error", err.Error())
 		return nil, err
 	}
 
 	categoryID, err := utils.ParseUUID(req.GetId())
 	if err != nil {
+		s.logger.Error("Failed to parse category id", "error", err.Error())
 		return nil, status.Error(codes.InvalidArgument, "invalid category ID format")
 	}
 
@@ -358,7 +385,7 @@ func (s *InventoryServer) UpdateCategory(ctx context.Context, req *UpdateCategor
 		if errors.Is(err, entity.ErrCategoryNotFound) {
 			return nil, status.Error(codes.NotFound, "category not found")
 		}
-		s.logger.Error("Failed to update category", "error", err.Error())
+		s.logger.Error("Failed to UpdateCategory", "error", err.Error())
 		return nil, status.Error(codes.Internal, "failed to update category")
 	}
 
@@ -372,6 +399,7 @@ func (s *InventoryServer) DeleteCategory(ctx context.Context, req *DeleteCategor
 
 	categoryID, err := utils.ParseUUID(req.GetId())
 	if err != nil {
+		s.logger.Error("Failed to parse category id", "error", err.Error())
 		return nil, status.Error(codes.InvalidArgument, "invalid category ID format")
 	}
 
@@ -380,7 +408,7 @@ func (s *InventoryServer) DeleteCategory(ctx context.Context, req *DeleteCategor
 		if errors.Is(err, entity.ErrCategoryNotFound) {
 			return nil, status.Error(codes.NotFound, "category not found")
 		}
-		s.logger.Error("Failed to delete category", "error", err.Error())
+		s.logger.Error("Failed to DeleteCategory", "error", err.Error())
 		return nil, status.Error(codes.Internal, "failed to delete category")
 	}
 
@@ -396,21 +424,27 @@ func (s *InventoryServer) ListCategories(ctx context.Context, req *ListCategorie
 		"sort_by", req.GetSortBy(),
 	)
 
+	sortBy, err := entity.ParseSortOption(req.GetSortBy())
+	if err != nil {
+		s.logger.Error("Invalid sort option", "error", err)
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
 	pagination := entity.NewPagination(
 		int64(req.GetPage()),
 		int64(req.GetPageSize()),
-		entity.SortOption(req.GetSortBy()),
+		sortBy,
 	)
 
 	paginatedData, err := s.service.GetPaginatedCategories(ctx, pagination)
 	if err != nil {
-		s.logger.Error("Failed to list categories", "error", err.Error())
+		s.logger.Error("Failed to GetPaginatedCategories", "error", err.Error())
 		return nil, status.Error(codes.Internal, "failed to list categories")
 	}
 
-	grpcCategories := make([]*Category, 0, len(paginatedData.Data))
+	grpcData := make([]*Category, 0, len(paginatedData.Data))
 	for _, category := range paginatedData.Data {
-		grpcCategories = append(grpcCategories, convertDomainCategoryToPB(category))
+		grpcData = append(grpcData, convertDomainCategoryToPB(category))
 	}
 
 	return &ListCategoriesResponse{
@@ -418,8 +452,50 @@ func (s *InventoryServer) ListCategories(ctx context.Context, req *ListCategorie
 		HasNextPage: paginatedData.HasNextPage,
 		PageSize:    int32(paginatedData.PageSize),
 		TotalPages:  int32(paginatedData.TotalPages),
-		Categories:  grpcCategories,
+		Categories:  grpcData,
 	}, nil
+}
+
+func (s *InventoryServer) ReserveProducts(ctx context.Context, req *ReserveProductRequest) (*Empty, error) {
+	s.logger.Info("Received ReserveProducts gRPC request", "id", req.GetId())
+
+	if err := ValidateReserveProductRequest(req); err != nil {
+		s.logger.Error("Failed to ValidateReserveProductRequest", "error", err.Error())
+		return nil, err
+	}
+
+	err := s.service.ReserveProduct(ctx, entity.UUID(req.GetId()), int64(req.GetQuantity()))
+	if err != nil {
+		if errors.Is(err, entity.ErrItemNotFound) {
+			return nil, status.Error(codes.NotFound, "item not found")
+		}
+		s.logger.Error("Failed to UpdateCategory", "error", err.Error())
+		return nil, status.Error(codes.Internal, "failed to reserve item")
+	}
+
+	return nil, nil
+}
+
+func ValidateCreateProductRequest(req *CreateProductRequest) error {
+	if len(req.Name) == 0 {
+		return status.Error(codes.InvalidArgument, "name cannot be empty")
+	}
+	if len(req.Description) == 0 {
+		return status.Error(codes.InvalidArgument, "description cannot be empty")
+	}
+	if _, err := utils.ParseUUID(req.GetCategoryId()); err != nil {
+		return status.Error(codes.InvalidArgument, "invalid category ID format")
+	}
+	if req.Price <= 0 {
+		return status.Error(codes.InvalidArgument, "price must be greater than zero")
+	}
+	if req.Quantity <= 0 {
+		return status.Error(codes.InvalidArgument, "quantity must be greater than zero")
+	}
+	if len(req.Unit) == 0 {
+		return status.Error(codes.InvalidArgument, "unit cannot be empty")
+	}
+	return nil
 }
 
 func ValidateCreateCategoryRequest(req *CreateCategoryRequest) error {
@@ -445,12 +521,22 @@ func ValidateUpdateCategoryRequest(req *UpdateCategoryRequest) error {
 	return nil
 }
 
+func ValidateReserveProductRequest(req *ReserveProductRequest) error {
+	if _, err := utils.ParseUUID(req.GetId()); err != nil {
+		return status.Error(codes.InvalidArgument, "invalid category ID format")
+	}
+	if req.Quantity <= 0 {
+		return status.Error(codes.InvalidArgument, "quantity must be greater than zero")
+	}
+	return nil
+}
+
 func convertDomainCategoryToPB(category *entity.Category) *Category {
 	return &Category{
 		Id:          category.ID.String(),
 		Name:        category.Name,
 		Description: category.Description,
-		CreatedAt:   category.CreatedAt.Format(time.RFC3339),
-		UpdatedAt:   category.UpdatedAt.Format(time.RFC3339),
+		CreatedAt:   timestamppb.New(category.CreatedAt),
+		UpdatedAt:   timestamppb.New(category.UpdatedAt),
 	}
 }

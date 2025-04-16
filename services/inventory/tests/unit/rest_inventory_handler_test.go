@@ -58,6 +58,9 @@ func (f *mockInventoryService) DeleteCategory(ctx context.Context, id entity.UUI
 func (m *mockInventoryService) GetPaginatedCategories(ctx context.Context, pagination *entity.Pagination) (*entity.PaginationResponse[*entity.Category], error) {
 	return nil, nil
 }
+func (m *mockInventoryService) ReserveProduct(context.Context, entity.UUID, int64) error {
+	return nil
+}
 
 // Test when a valid id is provided and the service returns a valid inventory item.
 func TestGetInventoryItemById_Handler_Success(t *testing.T) {

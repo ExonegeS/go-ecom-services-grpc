@@ -29,6 +29,7 @@ const (
 	InventoryService_UpdateCategory_FullMethodName  = "/inventory.InventoryService/UpdateCategory"
 	InventoryService_DeleteCategory_FullMethodName  = "/inventory.InventoryService/DeleteCategory"
 	InventoryService_ListCategories_FullMethodName  = "/inventory.InventoryService/ListCategories"
+	InventoryService_ReserveProducts_FullMethodName = "/inventory.InventoryService/ReserveProducts"
 )
 
 // InventoryServiceClient is the client API for InventoryService service.
@@ -45,6 +46,7 @@ type InventoryServiceClient interface {
 	UpdateCategory(ctx context.Context, in *UpdateCategoryRequest, opts ...grpc.CallOption) (*CategoryResponse, error)
 	DeleteCategory(ctx context.Context, in *DeleteCategoryRequest, opts ...grpc.CallOption) (*CategoryResponse, error)
 	ListCategories(ctx context.Context, in *ListCategoriesRequest, opts ...grpc.CallOption) (*ListCategoriesResponse, error)
+	ReserveProducts(ctx context.Context, in *ReserveProductRequest, opts ...grpc.CallOption) (*Empty, error)
 }
 
 type inventoryServiceClient struct {
@@ -155,6 +157,16 @@ func (c *inventoryServiceClient) ListCategories(ctx context.Context, in *ListCat
 	return out, nil
 }
 
+func (c *inventoryServiceClient) ReserveProducts(ctx context.Context, in *ReserveProductRequest, opts ...grpc.CallOption) (*Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Empty)
+	err := c.cc.Invoke(ctx, InventoryService_ReserveProducts_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // InventoryServiceServer is the server API for InventoryService service.
 // All implementations must embed UnimplementedInventoryServiceServer
 // for forward compatibility.
@@ -169,6 +181,7 @@ type InventoryServiceServer interface {
 	UpdateCategory(context.Context, *UpdateCategoryRequest) (*CategoryResponse, error)
 	DeleteCategory(context.Context, *DeleteCategoryRequest) (*CategoryResponse, error)
 	ListCategories(context.Context, *ListCategoriesRequest) (*ListCategoriesResponse, error)
+	ReserveProducts(context.Context, *ReserveProductRequest) (*Empty, error)
 	mustEmbedUnimplementedInventoryServiceServer()
 }
 
@@ -208,6 +221,9 @@ func (UnimplementedInventoryServiceServer) DeleteCategory(context.Context, *Dele
 }
 func (UnimplementedInventoryServiceServer) ListCategories(context.Context, *ListCategoriesRequest) (*ListCategoriesResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListCategories not implemented")
+}
+func (UnimplementedInventoryServiceServer) ReserveProducts(context.Context, *ReserveProductRequest) (*Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ReserveProducts not implemented")
 }
 func (UnimplementedInventoryServiceServer) mustEmbedUnimplementedInventoryServiceServer() {}
 func (UnimplementedInventoryServiceServer) testEmbeddedByValue()                          {}
@@ -410,6 +426,24 @@ func _InventoryService_ListCategories_Handler(srv interface{}, ctx context.Conte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _InventoryService_ReserveProducts_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ReserveProductRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InventoryServiceServer).ReserveProducts(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InventoryService_ReserveProducts_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InventoryServiceServer).ReserveProducts(ctx, req.(*ReserveProductRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // InventoryService_ServiceDesc is the grpc.ServiceDesc for InventoryService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -456,6 +490,10 @@ var InventoryService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListCategories",
 			Handler:    _InventoryService_ListCategories_Handler,
+		},
+		{
+			MethodName: "ReserveProducts",
+			Handler:    _InventoryService_ReserveProducts_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package inventory;
 
+import "google/protobuf/timestamp.proto";
+
 option go_package = "internal/adapters/inbound/grpc;grpc";
 
 service InventoryService {
@@ -16,6 +18,8 @@ service InventoryService {
   rpc UpdateCategory(UpdateCategoryRequest) returns (CategoryResponse);
   rpc DeleteCategory(DeleteCategoryRequest) returns (CategoryResponse);
   rpc ListCategories(ListCategoriesRequest) returns (ListCategoriesResponse);
+
+  rpc ReserveProducts(ReserveProductRequest) returns (Empty);
 }
 
 message Product {
@@ -26,16 +30,16 @@ message Product {
   double price = 5;
   double quantity = 6;
   string unit = 7;
-  string created_at = 8;
-  string updated_at = 9;
+  google.protobuf.Timestamp created_at = 8;
+  google.protobuf.Timestamp updated_at = 9;
 }
 
 message Category {
   string id = 1;
   string name = 2;
   string description = 3;
-  string created_at = 4;
-  string updated_at = 5;
+  google.protobuf.Timestamp created_at = 4;
+  google.protobuf.Timestamp updated_at = 5;
 }
 
 // Request/Response messages
@@ -99,6 +103,10 @@ message ListCategoriesRequest {
   string sort_by = 3;
 }
 
+message ReserveProductRequest {
+  string id = 1;
+  int32 quantity = 2;
+}
 
 
 message ListProductsResponse {
