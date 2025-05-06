@@ -74,7 +74,7 @@ func (r *postgresInventoryRepository) GetByID(ctx context.Context, id entity.UUI
 		)
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
-				return nil, model.ErrCategoryNotFound
+				return nil, entity.ErrCategoryNotFound
 			}
 			return nil, fmt.Errorf("%s: %w", op, err)
 		}
@@ -135,7 +135,7 @@ func (r *postgresInventoryRepository) UpdateByID(ctx context.Context, id entity.
 		)
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
-				return model.ErrProductNotFound
+				return entity.ErrItemNotFound
 			}
 			return fmt.Errorf("%s: %w", op, err)
 		}
@@ -150,7 +150,7 @@ func (r *postgresInventoryRepository) UpdateByID(ctx context.Context, id entity.
 			)
 			if err != nil {
 				if errors.Is(err, sql.ErrNoRows) {
-					return model.ErrCategoryNotFound
+					return entity.ErrCategoryNotFound
 				}
 				return fmt.Errorf("%s: %w", op, err)
 			}
@@ -275,7 +275,7 @@ func (r *postgresInventoryRepository) fetchCategoryData(ctx context.Context, cat
 	)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			err = model.ErrCategoryNotFound
+			err = entity.ErrCategoryNotFound
 			return
 		}
 		err = fmt.Errorf("%s: %w", op, err)
@@ -310,7 +310,7 @@ func (r *postgresInventoryRepository) GetCategoryByID(ctx context.Context, id en
 	)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, model.ErrCategoryNotFound
+			return nil, entity.ErrCategoryNotFound
 		}
 		return nil, fmt.Errorf("%s: %w", op, err)
 	}
@@ -354,7 +354,7 @@ func (r *postgresInventoryRepository) UpdateCategoryByID(ctx context.Context, id
 		)
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
-				return model.ErrCategoryNotFound
+				return entity.ErrCategoryNotFound
 			}
 			return fmt.Errorf("%s: %w", op, err)
 		}

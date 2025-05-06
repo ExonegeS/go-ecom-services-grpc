@@ -41,7 +41,7 @@ func NewConfig(filename string) Config {
 		Server: Server{
 			Address:  getEnv("ADDRESS", ""),
 			Port:     getEnv("PORT", "8080"),
-			GRPCPort: getEnv("GRPC_PORT", "5050"),
+			GRPCPort: getEnv("GRPC_PORT", "50051"),
 		},
 		DB: DataBase{
 			DBUser:     getEnv("DB_USER", "admin"),

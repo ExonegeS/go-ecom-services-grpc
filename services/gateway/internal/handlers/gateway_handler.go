@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/http/pprof"
 	"reflect"
 	"strconv"
 	"strings"
@@ -62,11 +63,19 @@ func NewGatewayHandler(service *config.Service, pool *clients.GrpcClientPool) *G
 func (h *GatewayHandler) RegisterRoutes(router *mux.Router) {
 	basePath := fmt.Sprintf("/api/%s", h.service.ApiVersion)
 	sub := router.PathPrefix(basePath).Subrouter()
-
 	for _, route := range h.service.Routes {
 		sub.HandleFunc(route.Path, h.universalHandler(route)).
 			Methods(route.Method)
 	}
+	registerPprof(router)
+}
+
+func registerPprof(r *mux.Router) {
+	r.HandleFunc("/debug/pprof/", pprof.Index)
+	r.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
+	r.HandleFunc("/debug/pprof/profile", pprof.Profile)
+	r.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+	r.HandleFunc("/debug/pprof/trace", pprof.Trace)
 }
 
 func (h *GatewayHandler) universalHandler(route config.RouteConfig) http.HandlerFunc {

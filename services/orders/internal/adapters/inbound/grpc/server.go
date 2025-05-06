@@ -115,7 +115,7 @@ func (s *OrdersServer) CreateOrder(ctx context.Context, req *CreateOrderRequest)
 		if errors.Is(err, entity.ErrItemNotFound) {
 			return nil, status.Error(codes.InvalidArgument, "specified item not exist")
 		}
-		s.logger.Error("Failed to create order", "error", err)
+		s.logger.Error("Failed to create order", "error", err.Error())
 		return nil, status.Error(codes.Internal, "failed to create order")
 	}
 
@@ -126,4 +126,160 @@ func (s *OrdersServer) CreateOrder(ctx context.Context, req *CreateOrderRequest)
 	return &OrderResponse{
 		Order: respOrder,
 	}, nil
+}
+
+// services/orders/internal/adapters/inbound/grpc/orders_server.go
+func (s *OrdersServer) UpdateOrder(ctx context.Context, req *UpdateOrderRequest) (*OrderResponse, error) {
+	s.logger.Info("Received UpdateOrder gRPC request", "id", req.GetId())
+
+	// Validate request
+	domainID, err := utils.ParseUUID(req.GetId())
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid order ID format")
+	}
+
+	// Parse status
+	var statusVal entity.OrderStatus
+	switch req.GetStatus() {
+	case "pending":
+		statusVal = entity.OrderStatusPending
+	case "processing":
+		statusVal = entity.OrderStatusProcessing
+	case "completed":
+		statusVal = entity.OrderStatusCompleted
+	case "cancelled":
+		statusVal = entity.OrderStatusCancelled
+	case "refunded":
+		statusVal = entity.OrderStatusRefunded
+	default:
+		return nil, status.Error(codes.InvalidArgument, "invalid order status")
+	}
+
+	// Prepare update parameters
+	params := application.UpdateOrderParams{
+		Status: &statusVal,
+	}
+	if req.GetUserName() != "" {
+		params.UserName = &req.UserName
+	}
+
+	// Call service
+	updatedOrder, err := s.service.UpdateOrder(ctx, domainID, params)
+	if err != nil {
+		if errors.Is(err, entity.ErrOrderNotFound) {
+			return nil, status.Error(codes.NotFound, "order not found")
+		}
+		s.logger.Error("Failed to update order", "error", err.Error())
+		return nil, status.Error(codes.Internal, "failed to update order")
+	}
+
+	// Convert to proto response
+	return &OrderResponse{
+		Order: convertOrderToProto(updatedOrder),
+	}, nil
+}
+
+func (s *OrdersServer) DeleteOrder(ctx context.Context, req *DeleteOrderRequest) (*OrderResponse, error) {
+	s.logger.Info("Received DeleteOrder gRPC request", "id", req.GetId())
+
+	domainID, err := utils.ParseUUID(req.GetId())
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid order ID format")
+	}
+
+	deletedOrder, err := s.service.DeleteOrder(ctx, domainID)
+	if err != nil {
+		if errors.Is(err, entity.ErrOrderNotFound) {
+			return nil, status.Error(codes.NotFound, "order not found")
+		}
+		s.logger.Error("Failed to delete order", "error", err.Error())
+		return nil, status.Error(codes.Internal, "failed to delete order")
+	}
+
+	return &OrderResponse{
+		Order: convertOrderToProto(deletedOrder),
+	}, nil
+}
+
+func (s *OrdersServer) ListOrders(ctx context.Context, req *ListOrdersRequest) (*ListOrdersResponse, error) {
+	s.logger.Info("Received ListOrders gRPC request")
+
+	// Validate pagination
+	if req.Page < 1 || req.PageSize < 1 {
+		return nil, status.Error(codes.InvalidArgument, "invalid pagination parameters")
+	}
+
+	sortBy, err := entity.ParseSortOption(req.GetSortBy())
+	if err != nil {
+		s.logger.Error("Invalid sort option", "error", err)
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	pagination := &entity.Pagination{
+		Page:     int64(req.Page),
+		PageSize: int64(req.PageSize),
+		SortBy:   sortBy,
+	}
+
+	result, err := s.service.GetPaginatedOrders(ctx, pagination)
+	if err != nil {
+		s.logger.Error("Failed to list orders", "error", err.Error())
+		return nil, status.Error(codes.Internal, "failed to list orders")
+	}
+
+	// Convert to proto response
+	response := &ListOrdersResponse{
+		CurrentPage: int32(result.CurrentPage),
+		HasNextPage: result.HasNextPage,
+		PageSize:    int32(result.PageSize),
+		TotalPages:  int32(result.TotalPages),
+		Orders:      make([]*Order, 0, len(result.Data)),
+	}
+
+	for _, order := range result.Data {
+		response.Orders = append(response.Orders, convertOrderToProto(order))
+	}
+
+	return response, nil
+}
+
+var orderStatusMap = map[entity.OrderStatus]OrderStatus{
+	entity.OrderStatusPending:    OrderStatus_ORDER_STATUS_PENDING,
+	entity.OrderStatusProcessing: OrderStatus_ORDER_STATUS_PROCESSING,
+	entity.OrderStatusCompleted:  OrderStatus_ORDER_STATUS_COMPLETED,
+	entity.OrderStatusCancelled:  OrderStatus_ORDER_STATUS_CANCELLED,
+	entity.OrderStatusRefunded:   OrderStatus_ORDER_STATUS_REFUNDED,
+}
+
+func OrderStatusToPB(s entity.OrderStatus) OrderStatus {
+	if v, ok := orderStatusMap[s]; ok {
+		return v
+	}
+	return OrderStatus_ORDER_STATUS_PENDING
+}
+
+func convertOrderToProto(order *entity.Order) *Order {
+	protoOrder := &Order{
+		Id:          order.ID.String(),
+		UserId:      order.UserID.String(),
+		UserName:    order.UserName,
+		TotalAmount: order.TotalAmount,
+		Status:      OrderStatusToPB(order.Status),
+		CreatedAt:   timestamppb.New(order.CreatedAt),
+		UpdatedAt:   timestamppb.New(order.UpdatedAt),
+		Items:       make([]*Item, 0, len(order.Items)),
+	}
+
+	for _, item := range order.Items {
+		protoOrder.Items = append(protoOrder.Items, &Item{
+			ProductId:   item.ProductID.String(),
+			ProductName: item.ProductName,
+			UnitPrice:   item.ProductPrice,
+			Quantity:    int32(item.Quantity),
+			CreatedAt:   timestamppb.New(item.CreatedAt),
+			UpdatedAt:   timestamppb.New(item.UpdatedAt),
+		})
+	}
+
+	return protoOrder
 }

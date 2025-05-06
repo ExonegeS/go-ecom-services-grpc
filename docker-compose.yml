@@ -55,7 +55,42 @@ services:
     env_file:
       - ./services/orders/.env.prod
     volumes:
-      - ./scripts/orders:/docker-entrypoint-initdb.d
+      - ./migrations/orders:/docker-entrypoint-initdb.d
+    ports:
+      - 5433:5432
+    restart: always
+
+  nats:
+    image: nats:latest
+    container_name: nats-server
+    ports:
+      - "4222:4222"
+    command: "-DV"
+    networks:
+      - default
+
+  statistics_service:
+    container_name: statistics-service
+    build:
+      context: ./services
+      dockerfile: Dockerfile.statistics
+    ports:
+      - "50053:50053"
+    depends_on:
+      - stats_db
+      - nats
+    env_file:
+      - ./services/statistics-service/.env.prod
+
+  stats_db:
+    image: postgres:latest
+    container_name: stats-postgres
+    env_file:
+      - ./services/statistics-service/.env.prod
+    volumes:
+      - ./migrations/statistics-service:/docker-entrypoint-initdb.d
+    ports:
+      - 5434:5432
     restart: always
 
 networks:

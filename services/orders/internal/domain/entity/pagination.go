@@ -71,6 +71,10 @@ type PaginationResponse[T any] struct {
 	Data        []T   `json:"data"`
 }
 
+func (p *Pagination) Offset() int64 {
+	return (p.Page - 1) * p.PageSize
+}
+
 func NewPagination(page, pageSize int64, sortBy SortOption) *Pagination {
 	if page < 1 {
 		page = 1

@@ -13,6 +13,7 @@ type Config struct {
 	Server      Server
 	Clients     map[string]Server
 	DB          DataBase
+	NATS        NATSConfig
 }
 
 type Server struct {
@@ -28,6 +29,9 @@ type DataBase struct {
 	DBPort     string
 	DBName     string
 }
+type NATSConfig struct {
+	URL string
+}
 
 func NewConfig(filename string) Config {
 	if filename != "" {
@@ -39,25 +43,25 @@ func NewConfig(filename string) Config {
 	clients := make(map[string]Server, 1)
 	clients[getEnv("INVENTORY_CLIENT_NAME", "inventory client")] = Server{
 		Address:  getEnv("INVENTORY_CLIENT_ADDRESS", "localhost"),
-		Port:     getEnv("INVENTORY_CLIENT_PORT", "8082"),
 		GRPCPort: getEnv("INVENTORY_CLIENT_GRPC_PORT", "50051"),
 	}
-
 	return Config{
 		Environment: getEnv("ENVIRONMENT", "development"),
 		Version:     getEnv("VERSION", "v1"),
 		Server: Server{
-			Address:  getEnv("ADDRESS", ""),
-			Port:     getEnv("PORT", "8082"),
+			Address:  getEnv("ADDRESS", "localhost"),
 			GRPCPort: getEnv("GRPC_PORT", "50052"),
 		},
 		Clients: clients,
 		DB: DataBase{
-			DBUser:     getEnv("DB_USER", "admin"),
-			DBPassword: getEnv("DB_PASSWORD", "admin"),
-			DBHost:     getEnv("DB_HOST", "db"),
+			DBUser:     getEnv("POSTGRES_USER", "admin"),
+			DBPassword: getEnv("POSTGRES_PASSWORD", "admin"),
+			DBHost:     getEnv("DB_HOST", "localhost"),
 			DBPort:     getEnv("DB_PORT", "5432"),
-			DBName:     getEnv("DB_NAME", "orders_db"),
+			DBName:     getEnv("POSTGRES_DB", "orders_db"),
+		},
+		NATS: NATSConfig{
+			URL: getEnv("NATS_URL", "nats://localhost:4222"),
 		},
 	}
 }

@@ -2,7 +2,6 @@ package model
 
 import (
 	"database/sql"
-	"fmt"
 	"time"
 
 	"github.com/ExonegeS/go-ecom-services-grpc/services/inventory/internal/domain/entity"
@@ -19,11 +18,6 @@ type Product struct {
 	CreatedAt   time.Time      `json:"created_at"`
 	UpdatedAt   time.Time      `json:"updated_at"`
 }
-
-var (
-	ErrProductNotFound  = fmt.Errorf("product not found")
-	ErrCategoryNotFound = fmt.Errorf("category not found")
-)
 
 func InventoryItemToModel(item *entity.InventoryItem) (*Product, *Category, error) {
 	category := &Category{
