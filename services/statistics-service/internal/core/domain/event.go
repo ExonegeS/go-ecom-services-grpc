@@ -1,4 +1,3 @@
-// internal/core/domain/events.go
 package domain
 
 import (

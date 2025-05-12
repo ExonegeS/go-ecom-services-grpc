@@ -80,7 +80,6 @@ func NewCORS(CORS_URLS string) func(next http.Handler) http.Handler {
 					w.Header().Set("Access-Control-Allow-Credentials", "true")
 				}
 
-				// Handle preflight OPTIONS request
 				if r.Method == http.MethodOptions {
 					w.WriteHeader(http.StatusOK)
 					return

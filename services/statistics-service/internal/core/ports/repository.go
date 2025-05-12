@@ -1,4 +1,3 @@
-// internal/core/ports/repository.go
 package ports
 
 import (

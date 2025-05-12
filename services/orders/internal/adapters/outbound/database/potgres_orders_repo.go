@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 
+	"github.com/ExonegeS/go-ecom-services-grpc/services/orders/internal/adapters/outbound/database/model"
 	"github.com/ExonegeS/go-ecom-services-grpc/services/orders/internal/domain/entity"
 	"github.com/ExonegeS/go-ecom-services-grpc/services/orders/internal/domain/ports"
 )
@@ -13,14 +14,12 @@ type postgresOrdersRepository struct {
 	db *sql.DB
 }
 
-// NewPostgresOrdersRepository returns a new OrdersRepository backed by Postgres.
 func NewPostgresOrdersRepository(db *sql.DB) ports.OrdersRepository {
 	return &postgresOrdersRepository{db: db}
 }
 
-func (r *postgresOrdersRepository) GetOrderByID(ctx context.Context, id entity.UUID) (*entity.Order, error) {
-	const op = "postgresOrdersRepository.GetOrderByID"
-	// fetch order
+func (r *postgresOrdersRepository) Order(ctx context.Context, id entity.UUID) (*entity.Order, error) {
+	const op = "postgresOrdersRepository.Order"
 	var ord entity.Order
 	err := r.db.QueryRowContext(ctx,
 		`SELECT id, user_id, user_name, total_amount, status, created_at, updated_at
@@ -40,7 +39,6 @@ func (r *postgresOrdersRepository) GetOrderByID(ctx context.Context, id entity.U
 		}
 		return nil, fmt.Errorf("%s: %w", op, err)
 	}
-	// fetch items
 	rows, err := r.db.QueryContext(ctx,
 		`SELECT product_id, product_name, product_price, quantity, created_at, updated_at
 		 FROM order_items WHERE order_id = $1`, ord.ID,
@@ -73,45 +71,47 @@ func (r *postgresOrdersRepository) GetOrderByID(ctx context.Context, id entity.U
 	return &ord, nil
 }
 
-func (r *postgresOrdersRepository) SaveOrder(ctx context.Context, ord entity.Order) error {
-	const op = "postgresOrdersRepository.SaveOrder"
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("%s begin tx: %w", op, err)
-	}
-	// insert order
-	_, err = tx.ExecContext(ctx,
-		`INSERT INTO orders(id, user_id, user_name, total_amount, status, created_at, updated_at)
-		 VALUES($1,$2,$3,$4,$5,$6,$7)`,
-		ord.ID, ord.UserID, ord.UserName, ord.TotalAmount, ord.Status, ord.CreatedAt, ord.UpdatedAt,
-	)
-	if err != nil {
-		tx.Rollback()
-		return fmt.Errorf("%s insert order: %w", op, err)
-	}
-	// insert items
-	for _, it := range ord.Items {
+func (r *postgresOrdersRepository) Save(ctx context.Context, ord entity.Order) error {
+	const op = "postgresOrdersRepository.Save"
+
+	return runInTx(ctx, r.db, func(tx *sql.Tx) error {
+		m, err := model.OrderToModel(&ord)
+		if err != nil {
+			return fmt.Errorf("%s: %w", op, err)
+		}
 		_, err = tx.ExecContext(ctx,
-			`INSERT INTO order_items(order_id, product_id, product_name, product_price, quantity, created_at, updated_at)
-			 VALUES($1,$2,$3,$4,$5,$6,$7)`,
-			ord.ID, it.ProductID, it.ProductName, it.ProductPrice, it.Quantity, it.CreatedAt, it.UpdatedAt,
+			`INSERT INTO orders(id, user_id, user_name, total_amount, status, created_at, updated_at)
+			VALUES($1,$2,$3,$4,$5,$6,$7)`,
+			m.ID, m.UserID, m.UserName,
+			m.TotalAmount, m.Status,
+			m.CreatedAt, m.UpdatedAt,
 		)
 		if err != nil {
-			tx.Rollback()
-			return fmt.Errorf("%s insert item: %w", op, err)
+			return fmt.Errorf("%s: %w", op, err)
 		}
-	}
-	return tx.Commit()
+		for _, item := range ord.Items {
+			i, err := model.OrderItemToModel(&item)
+			_, err = tx.ExecContext(ctx,
+				`INSERT INTO order_items(order_id, product_id, product_name, product_price, quantity, created_at, updated_at)
+				VALUES($1,$2,$3,$4,$5,$6,$7)`,
+				m.ID, i.ID, i.ProductName,
+				i.ProductPrice, i.Quantity,
+				i.CreatedAt, i.UpdatedAt,
+			)
+			if err != nil {
+				return fmt.Errorf("%s: %w", op, err)
+			}
+		}
+		return nil
+	})
 }
 
-func (r *postgresOrdersRepository) UpdateOrderByID(ctx context.Context, id entity.UUID, updateFn func(*entity.Order) (bool, error)) error {
-	const op = "postgresOrdersRepository.UpdateOrderByID"
-	// load existing
-	ord, err := r.GetOrderByID(ctx, id)
+func (r *postgresOrdersRepository) UpdateByID(ctx context.Context, id entity.UUID, updateFn func(*entity.Order) (bool, error)) error {
+	const op = "postgresOrdersRepository.UpdateByID"
+	ord, err := r.Order(ctx, id)
 	if err != nil {
 		return err
 	}
-	// apply update function
 	changed, err := updateFn(ord)
 	if err != nil {
 		return fmt.Errorf("%s updateFn: %w", op, err)
@@ -119,7 +119,6 @@ func (r *postgresOrdersRepository) UpdateOrderByID(ctx context.Context, id entit
 	if !changed {
 		return nil
 	}
-	// persist changes (only user_name, status, total_amount, updated_at)
 	_, err = r.db.ExecContext(ctx,
 		`UPDATE orders SET user_name=$1, status=$2, total_amount=$3, updated_at=$4 WHERE id=$5`,
 		ord.UserName, ord.Status, ord.TotalAmount, ord.UpdatedAt, ord.ID,
@@ -130,9 +129,8 @@ func (r *postgresOrdersRepository) UpdateOrderByID(ctx context.Context, id entit
 	return nil
 }
 
-func (r *postgresOrdersRepository) DeleteOrderByID(ctx context.Context, id entity.UUID) error {
-	const op = "postgresOrdersRepository.DeleteOrderByID"
-	// delete items, then order
+func (r *postgresOrdersRepository) DeleteByID(ctx context.Context, id entity.UUID) error {
+	const op = "postgresOrdersRepository.DeleteByID"
 	_, err := r.db.ExecContext(ctx, `DELETE FROM order_items WHERE order_id=$1`, id)
 	if err != nil {
 		return fmt.Errorf("%s delete items: %w", op, err)
@@ -156,7 +154,6 @@ func (r *postgresOrdersRepository) GetTotalOrdersCount(ctx context.Context) (int
 
 func (r *postgresOrdersRepository) GetAllOrders(ctx context.Context, pagination *entity.Pagination) ([]*entity.Order, error) {
 	const op = "postgresOrdersRepository.GetAllOrders"
-	// fetch paged orders
 	query := `SELECT id, user_id, user_name, total_amount, status, created_at, updated_at
 		 FROM orders ORDER BY created_at DESC LIMIT $1 OFFSET $2`
 	rows, err := r.db.QueryContext(ctx, query, pagination.PageSize, pagination.Offset())
@@ -180,7 +177,6 @@ func (r *postgresOrdersRepository) GetAllOrders(ctx context.Context, pagination 
 		if err != nil {
 			return nil, fmt.Errorf("%s scan order: %w", op, err)
 		}
-		// optionally preload items
 		orders = append(orders, ord)
 	}
 	if err = rows.Err(); err != nil {

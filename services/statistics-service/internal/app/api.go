@@ -26,8 +26,6 @@ func NewAPIServer(config *config.Config, logger *slog.Logger) *APIServer {
 }
 
 func (s *APIServer) Run() error {
-	// Initialize repository
-
 	connStr := s.cfg.Database.MakeConnectionString()
 	db, err := sql.Open("postgres", connStr)
 	if err != nil {
@@ -36,10 +34,8 @@ func (s *APIServer) Run() error {
 
 	repo := database.NewPostgresStatisticsRepository(db)
 
-	// Initialize service
-	service := service.NewStatisticsService(repo)
+	service := service.NewStatisticsService(repo, s.logger)
 
-	// Start NATS Subscriber
 	sub, err := nats.NewSubscriber(s.cfg.NATS, service, s.logger)
 	if err != nil {
 		log.Fatalf("could not register subscriber: %v", err)

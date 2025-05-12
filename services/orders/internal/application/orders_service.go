@@ -10,6 +10,7 @@ import (
 	"github.com/ExonegeS/go-ecom-services-grpc/services/orders/internal/adapters/outbound/nats"
 	"github.com/ExonegeS/go-ecom-services-grpc/services/orders/internal/domain/entity"
 	"github.com/ExonegeS/go-ecom-services-grpc/services/orders/internal/domain/ports"
+	"github.com/ExonegeS/go-ecom-services-grpc/services/orders/internal/utils"
 	"github.com/google/uuid"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -24,7 +25,6 @@ type OrdersService interface {
 	GetPaginatedOrders(ctx context.Context, pagination *entity.Pagination) (*entity.PaginationResponse[*entity.Order], error)
 }
 
-// services/orders/internal/application/orders_service.go
 type UpdateOrderParams struct {
 	UserName *string
 	Status   *entity.OrderStatus
@@ -49,14 +49,17 @@ func NewOrdersService(ordersRepo ports.OrdersRepository, inventoryClient ports.I
 }
 
 func (s *ordersService) GetOrderByID(ctx context.Context, id entity.UUID) (*entity.Order, error) {
-	return s.ordersRepo.GetOrderByID(ctx, id)
+	return s.ordersRepo.Order(ctx, id)
 }
 
 func (s *ordersService) CreateOrder(ctx context.Context, order *entity.Order) error {
 	if order == nil {
 		return entity.ErrInvalidRequestPayload
 	}
-	for _, item := range order.Items {
+	for i, item := range order.Items {
+		if _, err := utils.ParseUUID(item.ProductID.String()); err != nil {
+			return entity.ErrInvalidUUID
+		}
 		if item.Quantity <= 0 {
 			return entity.ErrInvalidQuantity
 		}
@@ -84,14 +87,46 @@ func (s *ordersService) CreateOrder(ctx context.Context, order *entity.Order) er
 		if !ok {
 			return entity.ErrInsufficientQuantity
 		}
+		order.TotalAmount += product.ProductPrice * float64(item.Quantity)
+		order.Items[i].ProductName = product.ProductName
+		order.Items[i].ProductPrice = product.ProductPrice
+		order.Items[i].CreatedAt = product.CreatedAt
+		order.Items[i].UpdatedAt = product.UpdatedAt
 	}
-	return entity.ErrNotImplemented
+	order.ID = entity.NewUUID()
+	order.CreatedAt = s.timeSource().UTC()
+	order.UpdatedAt = order.CreatedAt
+
+	items := make([]*grpc.OrderItem, 0, len(order.Items))
+	for _, item := range order.Items {
+		items = append(items,
+			&grpc.OrderItem{
+				ProductId: item.ProductID.String(),
+				Price:     item.ProductPrice,
+				Quantity:  int32(item.Quantity),
+			},
+		)
+	}
+	event := &grpc.OrderEvent{
+		EventId:   uuid.New().String(),
+		Operation: "created",
+		OrderId:   order.ID.String(),
+		UserId:    order.UserID.String(),
+		Total:     order.TotalAmount,
+		Items:     items,
+		Status:    string(order.Status),
+		CreatedAt: timestamppb.New(order.CreatedAt),
+		UpdatedAt: timestamppb.New(order.UpdatedAt),
+	}
+	if err := s.publisher.PublishOrderCreated(ctx, event); err != nil {
+		s.logger.Error("failed to publish order update event", "error", err)
+	}
+	return s.ordersRepo.Save(ctx, *order)
 }
 
 func (s *ordersService) UpdateOrder(ctx context.Context, id entity.UUID, params UpdateOrderParams) (*entity.Order, error) {
-	order, err := s.ordersRepo.GetOrderByID(ctx, id)
+	order, err := s.ordersRepo.Order(ctx, id)
 	if err != nil {
-		// return nil, fmt.Errorf("failed to get order: %w", err)
 		order = &entity.Order{
 			ID:     "007ab384-de75-4b56-8ade-890d3408d884",
 			UserID: "007ab384-de75-4b56-8ade-890d3408d884",
@@ -99,7 +134,6 @@ func (s *ordersService) UpdateOrder(ctx context.Context, id entity.UUID, params 
 		}
 	}
 
-	// Apply updates
 	if params.UserName != nil {
 		order.UserName = *params.UserName
 	}
@@ -107,13 +141,11 @@ func (s *ordersService) UpdateOrder(ctx context.Context, id entity.UUID, params 
 		order.Status = *params.Status
 	}
 
-	// Save updated order
 	// updatedOrder, err := s.ordersRepo.UpdateOrderByID(ctx, order.ID, order)
 	// if err != nil {
 	// 	return nil, fmt.Errorf("failed to update order: %w", err)
 	// }
 
-	// Publish update event
 	event := &grpc.OrderEvent{
 		EventId:   uuid.New().String(),
 		Operation: "updated",
@@ -130,16 +162,15 @@ func (s *ordersService) UpdateOrder(ctx context.Context, id entity.UUID, params 
 }
 
 func (s *ordersService) DeleteOrder(ctx context.Context, id entity.UUID) (*entity.Order, error) {
-	order, err := s.ordersRepo.GetOrderByID(ctx, id)
+	order, err := s.ordersRepo.Order(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get order: %w", err)
 	}
 
-	if err := s.ordersRepo.DeleteOrderByID(ctx, id); err != nil {
+	if err := s.ordersRepo.DeleteByID(ctx, id); err != nil {
 		return nil, fmt.Errorf("failed to delete order: %w", err)
 	}
 
-	// Publish delete event
 	event := &grpc.OrderEvent{
 		EventId:   uuid.New().String(),
 		Operation: "deleted",

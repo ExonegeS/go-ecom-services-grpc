@@ -80,7 +80,6 @@ func NewCORS(CORS_URLS string) func(next http.Handler) http.Handler {
 					w.Header().Set("Access-Control-Allow-Credentials", "true")
 				}
 
-				// Handle preflight OPTIONS request
 				if r.Method == http.MethodOptions {
 					w.WriteHeader(http.StatusOK)
 					return
@@ -111,7 +110,6 @@ func RequestValidator(msg proto.Message) mux.MiddlewareFunc {
 				return
 			}
 
-			// Clone prototype to avoid mutation
 			clone := proto.Clone(msg)
 
 			decoder := protojson.UnmarshalOptions{
@@ -125,7 +123,6 @@ func RequestValidator(msg proto.Message) mux.MiddlewareFunc {
 				return
 			}
 
-			// Add validation logic here using protoc-gen-validate
 			if validator, ok := clone.(interface {
 				Validate() error
 			}); ok {
@@ -135,7 +132,6 @@ func RequestValidator(msg proto.Message) mux.MiddlewareFunc {
 				}
 			}
 
-			// Store validated message in context
 			ctx := context.WithValue(r.Context(), "validated_request", clone)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})

@@ -112,7 +112,61 @@ func NewConfig() Config {
 					},
 				},
 			},
-			// Orders service configuration
+			{
+				Name:       "orders service",
+				GrpcAddr:   getEnv("ORDERS_GRPC_ADDR", "localhost:50052"),
+				ApiVersion: "v1",
+				Status:     "down",
+				Routes: []RouteConfig{
+					{
+						Method:      "GET",
+						Path:        "/orders",
+						GRPCService: "OrdersService",
+						GRPCMethod:  "ListOrders",
+						RequestType: "ListOrdersRequest",
+						QueryParams: []string{"Page", "PageSize", "SortBy"},
+					},
+					{
+						Method:      "GET",
+						Path:        "/orders/{id}",
+						GRPCService: "OrdersService",
+						GRPCMethod:  "GetOrderByID",
+						RequestType: "GetOrderRequest",
+						PathParams:  []string{"Id"},
+					},
+					{
+						Method:      "POST",
+						Path:        "/orders",
+						GRPCService: "OrdersService",
+						GRPCMethod:  "CreateOrder",
+						RequestType: "CreateOrderRequest",
+					},
+				},
+			},
+			{
+				Name:       "statistics service",
+				GrpcAddr:   getEnv("STATISTICS_GRPC_ADDR", "localhost:50053"),
+				ApiVersion: "v1",
+				Status:     "down",
+				Routes: []RouteConfig{
+					{
+						Method:      "GET",
+						Path:        "/statistics/user/{userid}/orders",
+						GRPCService: "StatisticsService",
+						GRPCMethod:  "GetUserOrdersStatistics",
+						RequestType: "UserOrderStatisticsRequest",
+						PathParams:  []string{"UserId"},
+					},
+					{
+						Method:      "GET",
+						Path:        "/statistics/user/{userid}",
+						GRPCService: "StatisticsService",
+						GRPCMethod:  "GetUserStatistics",
+						RequestType: "UserStatisticsRequest",
+						PathParams:  []string{"UserId"},
+					},
+				},
+			},
 		},
 		CorsURLs: getEnv("CORS_URLS", "*"),
 	}

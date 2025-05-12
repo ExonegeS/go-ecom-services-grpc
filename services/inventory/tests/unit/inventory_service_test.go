@@ -120,7 +120,6 @@ func TestCreateInventoryItem_Success(t *testing.T) {
 		},
 	}
 
-	// list me a func () time.Time, that simulate different dates
 	timeSource := func() time.Time {
 		return time.Date(2023, 1, 1, 0, 0, 0, 0, time.UTC)
 	}

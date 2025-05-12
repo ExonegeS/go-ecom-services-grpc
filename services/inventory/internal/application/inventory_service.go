@@ -125,7 +125,6 @@ func (s *inventoryService) GetPaginatedInventoryItems(ctx context.Context, pagin
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", op, err)
 	}
-
 	totalPages := (totalItems + pagination.PageSize - 1) / pagination.PageSize
 
 	items, err := s.inventoryRepo.GetAllInventoryItems(ctx, pagination)
@@ -250,7 +249,7 @@ func (s *inventoryService) DeleteCategory(ctx context.Context, id entity.UUID) (
 }
 
 func (s *inventoryService) UpdateInventoryItem(ctx context.Context, id entity.UUID, params UpdateInventoryItemParams) (*entity.InventoryItem, error) {
-	// const op = "service.UpdateInventoryItemById"
+	const op = "service.UpdateInventoryItemById"
 	var itemData *entity.InventoryItem
 
 	return itemData, s.inventoryRepo.UpdateByID(ctx, id, func(item *entity.InventoryItem) (updated bool, err error) {
@@ -273,7 +272,7 @@ func (s *inventoryService) UpdateInventoryItem(ctx context.Context, id entity.UU
 				if errors.Is(err, entity.ErrNotImplemented) {
 					return
 				}
-				err = fmt.Errorf("failed to get category: %w", err)
+				err = fmt.Errorf("%s: failed to get category: %w", op, err)
 				return
 			}
 

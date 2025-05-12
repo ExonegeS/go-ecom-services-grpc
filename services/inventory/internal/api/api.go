@@ -9,6 +9,7 @@ import (
 	"github.com/ExonegeS/go-ecom-services-grpc/services/inventory/internal/adapters/inbound/grpc"
 	"github.com/ExonegeS/go-ecom-services-grpc/services/inventory/internal/adapters/inbound/rest"
 	"github.com/ExonegeS/go-ecom-services-grpc/services/inventory/internal/adapters/inbound/rest/middleware"
+	"github.com/ExonegeS/go-ecom-services-grpc/services/inventory/internal/adapters/outbound/cache"
 	"github.com/ExonegeS/go-ecom-services-grpc/services/inventory/internal/adapters/outbound/database"
 	"github.com/ExonegeS/go-ecom-services-grpc/services/inventory/internal/application"
 	"github.com/ExonegeS/go-ecom-services-grpc/services/inventory/internal/config"
@@ -34,8 +35,9 @@ func NewAPIServer(cfg config.Config, db *sql.DB, logger *slog.Logger) *APIServer
 
 func (s *APIServer) Run() error {
 	invRepo := database.NewPostgresInventoryRepository(s.db)
+	cacheRepo := cache.NewCacheRepository(invRepo)
 
-	invService := application.NewInventoryService(invRepo, time.Now)
+	invService := application.NewInventoryService(cacheRepo, time.Now)
 
 	invHandler := rest.NewInventoryHandler(invService, s.logger)
 	healthHandler := rest.NewHealthHandler(s.logger, s.db)

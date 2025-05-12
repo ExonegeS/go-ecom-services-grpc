@@ -50,11 +50,11 @@ func NewConfig() *Config {
 			ClientID:  getEnvStr("NATS_CLIENT_ID", "statistics-service"),
 		},
 		DatabaseConfig{
-			DBUser:     getEnvStr("DB_USER", "admin"),
-			DBPassword: getEnvStr("DB_PASSWORD", "admin"),
-			DBHost:     getEnvStr("DB_HOST", "db"),
-			DBPort:     getEnvStr("DB_PORT", "5432"),
-			DBName:     getEnvStr("DB_NAME", "stats_db"),
+			DBUser:     getEnvStr("POSTGRES_USER", "admin"),
+			DBPassword: getEnvStr("POSTGRES_PASSWORD", "adminadmin"),
+			DBHost:     getEnvStr("DB_HOST", "localhost"),
+			DBPort:     getEnvStr("DB_PORT", "5434"),
+			DBName:     getEnvStr("POSTGRES_DB", "stats_db"),
 		},
 		GRPCConfig{
 			Port: getEnvStr("ORDERS_GRPC_PORT", "50052"),

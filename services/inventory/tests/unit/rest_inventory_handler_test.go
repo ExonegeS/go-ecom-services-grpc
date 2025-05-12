@@ -62,7 +62,6 @@ func (m *mockInventoryService) ReserveProduct(context.Context, entity.UUID, int6
 	return nil
 }
 
-// Test when a valid id is provided and the service returns a valid inventory item.
 func TestGetInventoryItemById_Handler_Success(t *testing.T) {
 	mockService := &mockInventoryService{
 		getByIDFn: func(ctx context.Context, id entity.UUID) (*entity.InventoryItem, error) {

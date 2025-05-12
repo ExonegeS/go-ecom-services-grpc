@@ -40,7 +40,6 @@ type Payment struct {
 	UpdatedAt     time.Time      `json:"updated_at"`
 }
 
-// Order conversions
 func OrderToModel(order *entity.Order) (*Order, error) {
 	return &Order{
 		ID:          order.ID.String(),
@@ -91,7 +90,6 @@ func ModelToOrder(m *Order, items []*OrderItem) (*entity.Order, error) {
 	return order, nil
 }
 
-// OrderItem conversions
 func OrderItemToModel(item *entity.OrderItem) (*OrderItem, error) {
 	return &OrderItem{
 		ID:           item.ProductID.String(),
@@ -123,42 +121,3 @@ func ModelToOrderItem(m *OrderItem) (*entity.OrderItem, *entity.UUID, error) {
 		UpdatedAt:    m.UpdatedAt,
 	}, &orderID, nil
 }
-
-// Payment conversions
-// func PaymentToModel(payment *entity.Payment) (*Payment, error) {
-// 	return &Payment{
-// 		ID:            payment.ID.String(),
-// 		OrderID:       payment.OrderID.String(),
-// 		Amount:        payment.Amount,
-// 		Currency:      payment.Currency,
-// 		PaymentMethod: payment.PaymentMethod,
-// 		Status:        payment.Status,
-// 		TransactionID: sql.NullString{String: payment.TransactionID, Valid: payment.TransactionID != ""},
-// 		CreatedAt:     payment.CreatedAt,
-// 		UpdatedAt:     payment.UpdatedAt,
-// 	}, nil
-// }
-
-// func ModelToPayment(m *Payment) (*entity.Payment, error) {
-// 	paymentID, err := utils.ParseUUID(m.ID)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	orderID, err := utils.ParseUUID(m.OrderID)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	return &entity.Payment{
-// 		ID:            paymentID,
-// 		OrderID:       orderID,
-// 		Amount:        m.Amount,
-// 		Currency:      m.Currency,
-// 		PaymentMethod: m.PaymentMethod,
-// 		Status:        m.Status,
-// 		TransactionID: m.TransactionID.String,
-// 		CreatedAt:     m.CreatedAt,
-// 		UpdatedAt:     m.UpdatedAt,
-// 	}, nil
-// }

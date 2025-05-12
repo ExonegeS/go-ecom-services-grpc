@@ -2,7 +2,7 @@ package service
 
 import (
 	"context"
-	"fmt"
+	"log/slog"
 
 	"github.com/ExonegeS/go-ecom-services-grpc/services/statistics/internal/core/domain"
 	"github.com/ExonegeS/go-ecom-services-grpc/services/statistics/internal/core/ports"
@@ -10,31 +10,42 @@ import (
 
 type StatisticsService struct {
 	statisticsRepo ports.StatisticsRepository
+	logger         *slog.Logger
 }
 
-func NewStatisticsService(statisticsRepo ports.StatisticsRepository) *StatisticsService {
+func NewStatisticsService(statisticsRepo ports.StatisticsRepository, logger *slog.Logger) *StatisticsService {
 	return &StatisticsService{
 		statisticsRepo: statisticsRepo,
+		logger:         logger,
 	}
 }
 
 func (s *StatisticsService) HandleOrderCreated(event domain.OrderEvent) {
 	const op = "StatisticsService.HandleOrderCreated"
-	fmt.Println(op)
+	err := s.statisticsRepo.UpdateOrderStatistics(context.Background(), event)
+	if err != nil {
+		s.logger.Error("Failed to update order statistics", slog.String("err", err.Error()))
+	}
 }
 func (s *StatisticsService) HandleOrderUpdated(event domain.OrderEvent) {
 	const op = "StatisticsService.HandleOrderUpdated"
-	fmt.Println(op)
+	err := s.statisticsRepo.UpdateOrderStatistics(context.Background(), event)
+	if err != nil {
+		s.logger.Error("Failed to update order statistics", slog.String("err", err.Error()))
+	}
 }
 func (s *StatisticsService) HandleOrderDeleted(event domain.OrderEvent) {
 	const op = "StatisticsService.HandleOrderDeleted"
-	fmt.Println(op)
+	err := s.statisticsRepo.UpdateOrderStatistics(context.Background(), event)
+	if err != nil {
+		s.logger.Error("Failed to update order statistics", slog.String("err", err.Error()))
+	}
 }
 
-func (s *StatisticsService) GetUserOrderStats(context.Context, domain.UUID) (*domain.UserOrderStats, error) {
-	return nil, domain.ErrNotImplemented
+func (s *StatisticsService) GetUserOrderStats(ctx context.Context, userID domain.UUID) (*domain.UserOrderStats, error) {
+	return s.statisticsRepo.GetUserOrderStats(ctx, userID)
 }
 
 func (s *StatisticsService) GetUserStatistics(ctx context.Context, userID domain.UUID) (*domain.UserStats, error) {
-	return nil, domain.ErrNotImplemented
+	return s.statisticsRepo.GetUserStatistics(ctx, userID)
 }

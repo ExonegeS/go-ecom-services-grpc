@@ -90,7 +90,7 @@ func (s *InventoryServer) CreateProduct(ctx context.Context, req *CreateProductR
 	s.logger.Info("Received CreateProduct gRPC request")
 
 	if err := ValidateCreateProductRequest(req); err != nil {
-		s.logger.Error("Invalid create request", "error", err)
+		s.logger.Error("Invalid create request", slog.String("error", err.Error()))
 		return nil, err
 	}
 	product := entity.InventoryItem{

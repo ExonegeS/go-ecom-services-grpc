@@ -1,4 +1,3 @@
-// internal/handlers/gateway_handler.go
 package handlers
 
 import (
@@ -40,7 +39,6 @@ func NewGatewayHandler(service *config.Service, pool *clients.GrpcClientPool) *G
 		RequestTypeRegistry: make(map[string]proto.Message),
 	}
 
-	// Register inventory service proto types
 	parser.RequestTypeRegistry["GetProductRequest"] = &pb.GetProductRequest{}
 	parser.RequestTypeRegistry["CreateProductRequest"] = &pb.CreateProductRequest{}
 	parser.RequestTypeRegistry["UpdateProductRequest"] = &pb.UpdateProductRequest{}
@@ -52,6 +50,15 @@ func NewGatewayHandler(service *config.Service, pool *clients.GrpcClientPool) *G
 	parser.RequestTypeRegistry["UpdateCategoryRequest"] = &pb.UpdateCategoryRequest{}
 	parser.RequestTypeRegistry["DeleteCategoryRequest"] = &pb.DeleteCategoryRequest{}
 	parser.RequestTypeRegistry["ListCategoriesRequest"] = &pb.ListCategoriesRequest{}
+
+	parser.RequestTypeRegistry["GetOrderRequest"] = &pb.GetOrderRequest{}
+	parser.RequestTypeRegistry["CreateOrderRequest"] = &pb.CreateOrderRequest{}
+	parser.RequestTypeRegistry["UpdateOrderRequest"] = &pb.UpdateOrderRequest{}
+	parser.RequestTypeRegistry["DeleteOrderRequest"] = &pb.DeleteOrderRequest{}
+	parser.RequestTypeRegistry["ListOrdersRequest"] = &pb.ListOrdersRequest{}
+
+	parser.RequestTypeRegistry["UserOrderStatisticsRequest"] = &pb.UserOrderStatisticsRequest{}
+	parser.RequestTypeRegistry["UserStatisticsRequest"] = &pb.UserStatisticsRequest{}
 
 	return &GatewayHandler{
 		service:     service,
@@ -83,34 +90,29 @@ func (h *GatewayHandler) universalHandler(route config.RouteConfig) http.Handler
 		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
 		defer cancel()
 
-		// Get gRPC client connection
 		conn, err := h.clientPool.GetConn()
 		if err != nil {
 			utils.WriteError(w, http.StatusBadGateway, err)
 			return
 		}
 
-		// Create gRPC request message
 		req, err := h.createGRPCRequest(r, route)
 		if err != nil {
 			utils.WriteError(w, http.StatusBadRequest, err)
 			return
 		}
 
-		// Invoke gRPC method
 		resp, err := h.invokeGRPCMethod(ctx, conn, route, req)
 		if err != nil {
 			h.handleGRPCError(w, err)
 			return
 		}
 
-		// Convert response to JSON
 		utils.WriteJSON(w, http.StatusOK, resp)
 	}
 }
 
 func (h *GatewayHandler) createGRPCRequest(r *http.Request, route config.RouteConfig) (proto.Message, error) {
-	// Get prototype from registry
 	reqProto, ok := h.protoParser.RequestTypeRegistry[route.RequestType]
 	if !ok {
 		return nil, fmt.Errorf("unknown request type: %s", route.RequestType)
@@ -118,19 +120,6 @@ func (h *GatewayHandler) createGRPCRequest(r *http.Request, route config.RouteCo
 
 	req := proto.Clone(reqProto)
 
-	// Parse path parameters
-	vars := mux.Vars(r)
-	for _, param := range route.PathParams {
-		if value, exists := vars[strings.ToLower(param)]; exists {
-			field := reflect.ValueOf(req).Elem().FieldByName(param)
-
-			if field.IsValid() && field.CanSet() {
-				field.SetString(value)
-			}
-		}
-	}
-
-	// Parse query parameters
 	query := r.URL.Query()
 	for _, param := range route.QueryParams {
 		values := query[param]
@@ -162,6 +151,16 @@ func (h *GatewayHandler) createGRPCRequest(r *http.Request, route config.RouteCo
 		}
 	}
 
+	vars := mux.Vars(r)
+	for _, param := range route.PathParams {
+		if value, exists := vars[strings.ToLower(param)]; exists {
+			field := reflect.ValueOf(req).Elem().FieldByName(param)
+
+			if field.IsValid() && field.CanSet() {
+				field.SetString(value)
+			}
+		}
+	}
 	return req, nil
 }
 
@@ -203,6 +202,12 @@ var clientConstructors = map[string]func(*grpc.ClientConn) interface{}{
 	"InventoryService": func(cc *grpc.ClientConn) interface{} {
 		return pb.NewInventoryServiceClient(cc)
 	},
+	"OrdersService": func(cc *grpc.ClientConn) interface{} {
+		return pb.NewOrdersServiceClient(cc)
+	},
+	"StatisticsService": func(cc *grpc.ClientConn) interface{} {
+		return pb.NewStatisticsServiceClient(cc)
+	},
 }
 
 func (h *GatewayHandler) invokeGRPCMethod(
@@ -237,7 +242,6 @@ func (h *GatewayHandler) invokeGRPCMethod(
 			route.GRPCMethod)
 	}
 
-	// Handle errors
 	if err := results[1].Interface(); err != nil {
 		return nil, err.(error)
 	}

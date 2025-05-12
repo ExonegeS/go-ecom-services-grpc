@@ -50,7 +50,7 @@ func (s *Subscriber) Subscribe() error {
 			return
 		}
 
-		domainEvent := convertProtoToDomainEvent(event)
+		domainEvent := convertProtoToDomainEvent(&event)
 
 		switch msg.Subject {
 		case "orders.created":
@@ -66,7 +66,7 @@ func (s *Subscriber) Subscribe() error {
 	return err
 }
 
-func convertProtoToDomainEvent(pbEvent orderspb.OrderEvent) domain.OrderEvent {
+func convertProtoToDomainEvent(pbEvent *orderspb.OrderEvent) domain.OrderEvent {
 	return domain.OrderEvent{
 		EventID:   pbEvent.GetEventId(),
 		Operation: pbEvent.GetOperation(),
@@ -75,5 +75,19 @@ func convertProtoToDomainEvent(pbEvent orderspb.OrderEvent) domain.OrderEvent {
 		Total:     pbEvent.GetTotal(),
 		Status:    pbEvent.GetStatus(),
 		CreatedAt: pbEvent.GetCreatedAt().AsTime(),
+		UpdatedAt: pbEvent.GetUpdatedAt().AsTime(),
+		Items:     convertProtoToDomainItems(pbEvent.GetItems()),
 	}
+}
+
+func convertProtoToDomainItems(pbItems []*orderspb.OrderItem) []domain.OrderItem {
+	items := make([]domain.OrderItem, len(pbItems))
+	for i, item := range pbItems {
+		items[i] = domain.OrderItem{
+			ProductID: item.GetProductId(),
+			Price:     item.GetPrice(),
+			Quantity:  item.GetQuantity(),
+		}
+	}
+	return items
 }

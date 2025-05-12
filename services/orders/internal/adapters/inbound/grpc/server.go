@@ -46,24 +46,47 @@ func StartGRPCServer(grpcPort string, orderService application.OrdersService, lo
 }
 
 func (s *OrdersServer) GetOrderByID(ctx context.Context, req *GetOrderRequest) (*OrderResponse, error) {
-	s.logger.Info("Received GetProductByID gRPC request", "id", req.GetId())
+	s.logger.Info("Received GetOrderByID gRPC request", "id", req.GetId())
 	domainID := req.GetId()
+
 	id, err := utils.ParseUUID(domainID)
 	if err != nil {
 		s.logger.Error("Failed to parse order id", "error", err.Error())
 		return nil, status.Error(codes.InvalidArgument, "invalid order ID format")
 	}
 
-	product, err := s.service.GetOrderByID(ctx, id)
+	order, err := s.service.GetOrderByID(ctx, id)
 	if err != nil {
-		s.logger.Error("Error fetching product", "error", err.Error())
-		return nil, fmt.Errorf("failed to get product: %w", err)
+		if errors.Is(err, entity.ErrOrderNotFound) {
+			return nil, status.Error(codes.NotFound, "order not found")
+		}
+		s.logger.Error("Error fetching order", "error", err.Error())
+		return nil, fmt.Errorf("failed to get order: %w", err)
+	}
+
+	items := make([]*Item, 0, len(order.Items))
+	for _, item := range order.Items {
+		items = append(items,
+			&Item{
+				ProductId:   item.ProductID.String(),
+				ProductName: item.ProductName,
+				UnitPrice:   item.ProductPrice,
+				Quantity:    int32(item.Quantity),
+				CreatedAt:   timestamppb.New(item.CreatedAt),
+				UpdatedAt:   timestamppb.New(item.UpdatedAt),
+			},
+		)
 	}
 
 	respOrder := &Order{
-		Id:        product.ID.String(),
-		CreatedAt: timestamppb.New(product.CreatedAt),
-		UpdatedAt: timestamppb.New(product.UpdatedAt),
+		Id:          order.ID.String(),
+		UserId:      order.UserID.String(),
+		UserName:    order.UserName,
+		TotalAmount: order.TotalAmount,
+		Status:      OrderStatusToPB(order.Status),
+		Items:       items,
+		CreatedAt:   timestamppb.New(order.CreatedAt),
+		UpdatedAt:   timestamppb.New(order.UpdatedAt),
 	}
 
 	return &OrderResponse{Order: respOrder}, nil
@@ -74,10 +97,10 @@ func ValidateCreateOrderRequest(req *CreateOrderRequest) error {
 		return status.Error(codes.InvalidArgument, "invalid user ID format")
 	}
 	if len(req.Name) == 0 {
-		return status.Error(codes.InvalidArgument, "name cannot be empty")
+		return status.Error(codes.InvalidArgument, "'name' cannot be empty")
 	}
 	if len(req.Items) == 0 {
-		return status.Error(codes.InvalidArgument, "order items cannot be empty")
+		return status.Error(codes.InvalidArgument, "order 'items' cannot be empty")
 	}
 	return nil
 }
@@ -86,7 +109,7 @@ func (s *OrdersServer) CreateOrder(ctx context.Context, req *CreateOrderRequest)
 	s.logger.Info("Received CreateOrder gRPC request")
 
 	if err := ValidateCreateOrderRequest(req); err != nil {
-		s.logger.Error("Invalid create request", "error", err)
+		s.logger.Error("Invalid create request", slog.String("error", err.Error()))
 		return nil, err
 	}
 
@@ -106,6 +129,9 @@ func (s *OrdersServer) CreateOrder(ctx context.Context, req *CreateOrderRequest)
 
 	err := s.service.CreateOrder(ctx, &order)
 	if err != nil {
+		if errors.Is(err, entity.ErrInvalidUUID) {
+			return nil, status.Error(codes.InvalidArgument, "invalid product ID format")
+		}
 		if errors.Is(err, entity.ErrInvalidQuantity) {
 			return nil, status.Error(codes.InvalidArgument, "invalid item quantity")
 		}
@@ -128,17 +154,14 @@ func (s *OrdersServer) CreateOrder(ctx context.Context, req *CreateOrderRequest)
 	}, nil
 }
 
-// services/orders/internal/adapters/inbound/grpc/orders_server.go
 func (s *OrdersServer) UpdateOrder(ctx context.Context, req *UpdateOrderRequest) (*OrderResponse, error) {
 	s.logger.Info("Received UpdateOrder gRPC request", "id", req.GetId())
 
-	// Validate request
 	domainID, err := utils.ParseUUID(req.GetId())
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid order ID format")
 	}
 
-	// Parse status
 	var statusVal entity.OrderStatus
 	switch req.GetStatus() {
 	case "pending":
@@ -155,7 +178,6 @@ func (s *OrdersServer) UpdateOrder(ctx context.Context, req *UpdateOrderRequest)
 		return nil, status.Error(codes.InvalidArgument, "invalid order status")
 	}
 
-	// Prepare update parameters
 	params := application.UpdateOrderParams{
 		Status: &statusVal,
 	}
@@ -163,7 +185,6 @@ func (s *OrdersServer) UpdateOrder(ctx context.Context, req *UpdateOrderRequest)
 		params.UserName = &req.UserName
 	}
 
-	// Call service
 	updatedOrder, err := s.service.UpdateOrder(ctx, domainID, params)
 	if err != nil {
 		if errors.Is(err, entity.ErrOrderNotFound) {
@@ -173,7 +194,6 @@ func (s *OrdersServer) UpdateOrder(ctx context.Context, req *UpdateOrderRequest)
 		return nil, status.Error(codes.Internal, "failed to update order")
 	}
 
-	// Convert to proto response
 	return &OrderResponse{
 		Order: convertOrderToProto(updatedOrder),
 	}, nil
@@ -202,12 +222,11 @@ func (s *OrdersServer) DeleteOrder(ctx context.Context, req *DeleteOrderRequest)
 }
 
 func (s *OrdersServer) ListOrders(ctx context.Context, req *ListOrdersRequest) (*ListOrdersResponse, error) {
-	s.logger.Info("Received ListOrders gRPC request")
-
-	// Validate pagination
-	if req.Page < 1 || req.PageSize < 1 {
-		return nil, status.Error(codes.InvalidArgument, "invalid pagination parameters")
-	}
+	s.logger.Info("Received ListOrders gRPC request",
+		"page", req.GetPage(),
+		"page_size", req.GetPageSize(),
+		"sort_by", req.GetSortBy(),
+	)
 
 	sortBy, err := entity.ParseSortOption(req.GetSortBy())
 	if err != nil {
@@ -215,11 +234,11 @@ func (s *OrdersServer) ListOrders(ctx context.Context, req *ListOrdersRequest) (
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	pagination := &entity.Pagination{
-		Page:     int64(req.Page),
-		PageSize: int64(req.PageSize),
-		SortBy:   sortBy,
-	}
+	pagination := entity.NewPagination(
+		int64(req.GetPage()),
+		int64(req.GetPageSize()),
+		sortBy,
+	)
 
 	result, err := s.service.GetPaginatedOrders(ctx, pagination)
 	if err != nil {
@@ -227,7 +246,6 @@ func (s *OrdersServer) ListOrders(ctx context.Context, req *ListOrdersRequest) (
 		return nil, status.Error(codes.Internal, "failed to list orders")
 	}
 
-	// Convert to proto response
 	response := &ListOrdersResponse{
 		CurrentPage: int32(result.CurrentPage),
 		HasNextPage: result.HasNextPage,

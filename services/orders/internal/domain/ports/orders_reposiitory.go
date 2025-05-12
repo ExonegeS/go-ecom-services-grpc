@@ -7,10 +7,10 @@ import (
 )
 
 type OrdersRepository interface {
-	GetOrderByID(ctx context.Context, id entity.UUID) (*entity.Order, error)
-	SaveOrder(ctx context.Context, item entity.Order) error
-	UpdateOrderByID(ctx context.Context, id entity.UUID, updateFn func(*entity.Order) (bool, error)) error
-	DeleteOrderByID(ctx context.Context, id entity.UUID) error
+	Order(ctx context.Context, id entity.UUID) (*entity.Order, error)
+	Save(ctx context.Context, item entity.Order) error
+	UpdateByID(ctx context.Context, id entity.UUID, updateFn func(*entity.Order) (bool, error)) error
+	DeleteByID(ctx context.Context, id entity.UUID) error
 	GetTotalOrdersCount(ctx context.Context) (int64, error)
 	GetAllOrders(ctx context.Context, pagination *entity.Pagination) ([]*entity.Order, error)
 }
